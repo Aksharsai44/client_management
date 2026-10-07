@@ -291,7 +291,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDemoRequests((prev) => [newRequest, ...prev]);
 
     // Format WhatsApp message
-    const message = `Hello OmniSuite Enterprise Team! 🚀\nI would like to request a demo of your platform.\n\n👤 *Name:* ${data.name}\n🏢 *Company:* ${data.companyName}\n📧 *Email:* ${data.email}\n📱 *Phone:* ${data.phone}\n👥 *Team Size:* ${data.teamSize}\n📝 *Requirements:* ${data.requirements || 'Looking forward to testing the product features!'}`;
+    const message = `Hello Client Management Team! 🚀\nI would like to request a demo of your platform.\n\n👤 *Name:* ${data.name}\n🏢 *Company:* ${data.companyName}\n📧 *Email:* ${data.email}\n📱 *Phone:* ${data.phone}\n👥 *Team Size:* ${data.teamSize}\n📝 *Requirements:* ${data.requirements || 'Looking forward to testing the product features!'}`;
     const encoded = encodeURIComponent(message);
     const cleanPhone = targetWhatsappNumber.replace(/\D/g, '');
     const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encoded}`;

@@ -71,9 +71,9 @@ export const BrochurePage: React.FC = () => {
               <Layers className="w-6 h-6" />
             </div>
             <div>
-              <span className="text-xl font-bold tracking-tight text-slate-900">OmniSuite</span>
+              <span className="text-xl font-bold tracking-tight text-slate-900">Client Management</span>
               <span className="text-[10px] font-bold tracking-widest text-blue-600 block uppercase -mt-1">
-                Enterprise & Client Portal
+                Workspace
               </span>
             </div>
           </div>
@@ -710,9 +710,9 @@ export const BrochurePage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center space-x-2">
             <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
-              O
+              <Layers className="w-3.5 h-3.5" />
             </div>
-            <span className="font-bold text-slate-900">OmniSuite Enterprise</span>
+            <span className="font-bold text-slate-900">Client Management</span>
             <span>&copy; {new Date().getFullYear()} All rights reserved.</span>
           </div>
 

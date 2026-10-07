@@ -40,7 +40,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({ us
   const handleDownload = () => {
     const reportText = `=====================================================
 OFFICIAL ATTENDANCE AND PARTICIPATION REPORT
-OmniSuite Enterprise Management System
+Client Management Workspace
 =====================================================
 
 PARTICIPANT DETAILS:
@@ -74,7 +74,7 @@ ${batchMeetings.map((m) => {
 
 CERTIFICATION:
 This document confirms verified attendance metrics logged automatically
-during live sessions on the OmniSuite enterprise collaboration platform.
+during live sessions on the Client Management collaboration platform.
 
 Generated on: ${new Date().toISOString()}
 =====================================================`;
@@ -274,7 +274,7 @@ Generated on: ${new Date().toISOString()}
           </div>
 
           <div className="text-[11px] text-slate-400 border-t border-slate-200 pt-3 flex justify-between">
-            <span>Verified System Log &bull; OmniSuite Enterprise</span>
+            <span>Verified System Log &bull; Client Management Workspace</span>
             <span>Generated on {new Date().toLocaleDateString()}</span>
           </div>
         </div>

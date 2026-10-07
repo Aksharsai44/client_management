@@ -59,9 +59,9 @@ export const LoginPage: React.FC = () => {
             <Layers className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">OmniSuite</h2>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Client Management</h2>
             <span className="text-[10px] font-bold text-blue-600 block uppercase tracking-widest -mt-1">
-              Enterprise Unified Portal
+              Workspace
             </span>
           </div>
         </div>
