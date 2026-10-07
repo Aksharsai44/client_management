@@ -103,8 +103,13 @@ interface AppContextType {
   addResourceReview: (resourceId: string, rating: number, feedback: string) => void;
   updateIntegrationSettings: (newSettings: Partial<IntegrationSettings>) => void;
   updateCompanySettings: (newSettings: Partial<CompanySettings>) => void;
-  toggleCompanyIntegration: (companyId: string, type: 'whatsapp' | 'email', value: boolean) => void;
-  createProductAdminAccount: (name: string, email: string, assignedCompanyIds: string[]) => void;
+  createProductAdminAccount: (
+    name: string,
+    email: string,
+    assignedCompanyIds: string[],
+    phone?: string,
+    designation?: string
+  ) => void;
   addCompanyAdminMetric: (company: {
     companyName: string;
     adminName: string;
@@ -676,7 +681,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const createProductAdminAccount = (name: string, email: string, assignedCompanyIds: string[]) => {
+  const createProductAdminAccount = (
+    name: string,
+    email: string,
+    assignedCompanyIds: string[],
+    phone?: string,
+    designation?: string
+  ) => {
     const newProdAdmin: User = {
       id: `user_padmin_${Date.now()}`,
       name,
@@ -684,8 +695,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       role: 'product_admin',
       batchIds: ['batch_alpha'],
       status: 'active',
-      phone: '+1 (555) 700-1122',
-      designation: 'Product Administrator',
+      phone: phone || '+1 (555) 700-1122',
+      designation: designation || 'Product Administrator',
       joinedDate: new Date().toISOString().split('T')[0],
       assignedCompanyAdminIds: assignedCompanyIds,
     };
