@@ -1,0 +1,6 @@
+{
+  "name": "OmniSuite Enterprise & Client Portal",
+  "description": "Multi-tier SaaS platform featuring public brochure with WhatsApp demo requests, Product Admin, Company Admin, Client and Work User dashboards with meetings, WhatsApp-style chat, AI transcripts, and attendance tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
