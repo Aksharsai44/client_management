@@ -12,36 +12,56 @@ import {
   KeyRound,
   CheckCircle,
   AlertCircle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const {
     loginUser,
+    users,
     quickSwitchRole,
     setCurrentView,
     demoRequests,
   } = useApp();
 
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
-      setStatusMessage({ type: 'error', text: 'Please enter your email address' });
+    if (!identifier.trim()) {
+      setStatusMessage({ type: 'error', text: 'Please enter your Corporate Email or User ID' });
+      return;
+    }
+    if (!password.trim()) {
+      setStatusMessage({ type: 'error', text: 'Please enter your password' });
       return;
     }
 
-    const result = loginUser(email, password);
-    if (!result.success) {
-      setStatusMessage({ type: 'error', text: result.message });
+    setIsSubmitting(true);
+    setStatusMessage(null);
+    try {
+      const result = await loginUser(identifier, password);
+      if (!result.success) {
+        setStatusMessage({ type: 'error', text: result.message });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const activeDemoCredentials = demoRequests.filter(
     (d) => d.dummyCredential && d.dummyCredential.isActive
   );
+
+  // Get dynamic sample accounts from active database users
+  const latestClientUser = users.find((u) => u.role === 'client');
+  const latestWorkerUser = users.find((u) => u.role === 'work_user');
+  const latestCompanyAdmin = users.find((u) => u.role === 'company_admin');
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -67,7 +87,7 @@ export const LoginPage: React.FC = () => {
         </div>
 
         <p className="mt-2 text-center text-xs text-slate-500">
-          Sign in to access your role-specific dashboard & workspace
+          Sign in with your Email or User ID to access your role-specific dashboard
         </p>
       </div>
 
@@ -93,17 +113,17 @@ export const LoginPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Corporate Email Address
+                Corporate Email Address or User ID
               </label>
               <div className="relative rounded-xl shadow-2xs">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                   <Mail className="w-4 h-4" />
                 </div>
                 <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@company.com"
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="e.g. name@company.com or user_179189..."
                   className="block w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
@@ -112,27 +132,40 @@ export const LoginPage: React.FC = () => {
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="block text-xs font-bold text-slate-700">Password</label>
-                <span className="text-[11px] text-slate-400">Default: OmniDefault@2026</span>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  {identifier.toLowerCase().includes('admin') && !identifier.toLowerCase().includes('comp')
+                    ? 'Product Admin: Password from .env required'
+                    : 'Default: OmniDefault@2026'}
+                </span>
               </div>
               <div className="relative rounded-xl shadow-2xs">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="block w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="block w-full pl-9 pr-10 py-2.5 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
             <button
               type="submit"
-              className="w-full py-2.5 px-4 border border-transparent rounded-xl shadow-sm text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+              disabled={isSubmitting}
+              className="w-full py-2.5 px-4 border border-transparent rounded-xl shadow-sm text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 cursor-pointer"
             >
-              Sign In to Portal
+              {isSubmitting ? 'Signing In...' : 'Sign In to Portal'}
             </button>
           </form>
 
@@ -144,54 +177,101 @@ export const LoginPage: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-2">
               <button
-                onClick={() => quickSwitchRole('product_super_admin')}
-                className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/70 hover:bg-purple-100 text-left transition-colors"
+                type="button"
+                onClick={() => {
+                  const adminUsername =
+                    import.meta.env.VITE_PRODUCT_ADMIN_USERNAME ||
+                    'admin@product.com';
+                  setIdentifier(adminUsername);
+                  setPassword('');
+                  setStatusMessage({
+                    type: 'error',
+                    text: 'Product Admin is password-protected. Enter the password configured in .env to sign in.',
+                  });
+                }}
+                className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/70 hover:bg-purple-100 text-left transition-colors cursor-pointer"
+                title="Autofill Product Admin username"
               >
-                <div className="flex items-center space-x-1.5 text-purple-700 font-bold text-xs">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Product Admin</span>
+                <div className="flex items-center justify-between text-purple-700 font-bold text-xs">
+                  <div className="flex items-center space-x-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Product Admin</span>
+                  </div>
+                  <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-purple-200/80 text-purple-900">
+                    .env Protected
+                  </span>
                 </div>
-                <div className="text-[10px] text-purple-600 truncate mt-0.5">
-                  superadmin@omnisuite.io
+                <div className="text-[10px] text-purple-600 truncate mt-0.5 font-mono">
+                  {import.meta.env.VITE_PRODUCT_ADMIN_USERNAME || 'admin@product.com'}
                 </div>
               </button>
 
               <button
-                onClick={() => quickSwitchRole('company_admin')}
-                className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100 text-left transition-colors"
+                type="button"
+                onClick={() => {
+                  setIdentifier(latestCompanyAdmin?.email || 'admin@acmecorp.com');
+                  setPassword('Acme@123');
+                }}
+                className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100 text-left transition-colors cursor-pointer"
+                title="Autofill Company Admin credentials"
               >
-                <div className="flex items-center space-x-1.5 text-blue-700 font-bold text-xs">
-                  <Building className="w-3.5 h-3.5" />
-                  <span>Company Admin</span>
+                <div className="flex items-center justify-between text-blue-700 font-bold text-xs">
+                  <div className="flex items-center space-x-1.5">
+                    <Building className="w-3.5 h-3.5" />
+                    <span>Company Admin</span>
+                  </div>
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-blue-100 text-blue-800">
+                    Autofill
+                  </span>
                 </div>
-                <div className="text-[10px] text-blue-600 truncate mt-0.5">
-                  admin@acmecorp.com
+                <div className="text-[10px] text-blue-600 truncate mt-0.5 font-mono">
+                  {latestCompanyAdmin?.email || 'admin@acmecorp.com'}
                 </div>
               </button>
 
               <button
-                onClick={() => quickSwitchRole('client')}
-                className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-left transition-colors"
+                type="button"
+                onClick={() => {
+                  setIdentifier(latestClientUser?.email || latestClientUser?.id || 'john@gmail.com');
+                  setPassword(latestClientUser?.password || 'OmniDefault@2026');
+                }}
+                className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100 text-left transition-colors cursor-pointer"
+                title="Autofill Client Portal credentials"
               >
-                <div className="flex items-center space-x-1.5 text-emerald-700 font-bold text-xs">
-                  <UserCheck className="w-3.5 h-3.5" />
-                  <span>Client Portal</span>
+                <div className="flex items-center justify-between text-emerald-700 font-bold text-xs">
+                  <div className="flex items-center space-x-1.5">
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Client Portal</span>
+                  </div>
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800">
+                    Autofill
+                  </span>
                 </div>
-                <div className="text-[10px] text-emerald-600 truncate mt-0.5">
-                  sarah.client@globex.com
+                <div className="text-[10px] text-emerald-600 truncate mt-0.5 font-mono">
+                  {latestClientUser?.email || 'john@gmail.com'}
                 </div>
               </button>
 
               <button
-                onClick={() => quickSwitchRole('work_user')}
-                className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100 text-left transition-colors"
+                type="button"
+                onClick={() => {
+                  setIdentifier(latestWorkerUser?.email || latestWorkerUser?.id || 'raju@gmail.com');
+                  setPassword(latestWorkerUser?.password || 'OmniDefault@2026');
+                }}
+                className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100 text-left transition-colors cursor-pointer"
+                title="Autofill Worker Portal credentials"
               >
-                <div className="flex items-center space-x-1.5 text-amber-700 font-bold text-xs">
-                  <Briefcase className="w-3.5 h-3.5" />
-                  <span>Work User</span>
+                <div className="flex items-center justify-between text-amber-700 font-bold text-xs">
+                  <div className="flex items-center space-x-1.5">
+                    <Briefcase className="w-3.5 h-3.5" />
+                    <span>Work User</span>
+                  </div>
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
+                    Autofill
+                  </span>
                 </div>
-                <div className="text-[10px] text-amber-600 truncate mt-0.5">
-                  alex.dev@acme.internal
+                <div className="text-[10px] text-amber-600 truncate mt-0.5 font-mono">
+                  {latestWorkerUser?.email || 'raju@gmail.com'}
                 </div>
               </button>
             </div>
@@ -216,7 +296,7 @@ export const LoginPage: React.FC = () => {
                     </div>
                     <button
                       onClick={() => {
-                        setEmail(req.dummyCredential!.username);
+                        setIdentifier(req.dummyCredential!.username);
                         setPassword(req.dummyCredential!.temporaryPassword);
                       }}
                       className="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-semibold text-[10px] rounded transition-colors shrink-0"

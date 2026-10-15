@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PricingPlan } from '../../../types';
+import { UNIVERSAL_CURRENCIES, getCurrencyConfig } from '../../../utils/currency';
 
 interface PricingPlanModalProps {
   editingPlan: PricingPlan | null;
@@ -19,8 +20,10 @@ export const PricingPlanModal: React.FC<PricingPlanModalProps> = ({
     return {
       name: 'Enterprise Growth Tier',
       tagline: 'Engineered for scaling distributed enterprise accounts',
-      monthlyPrice: 249,
-      yearlyPrice: 2390,
+      monthlyPrice: 19999,
+      yearlyPrice: 190000,
+      currency: 'INR',
+      currencySymbol: '₹',
       popular: false,
       features: [
         'Up to 250 Active Portal Users',
@@ -83,10 +86,33 @@ export const PricingPlanModal: React.FC<PricingPlanModalProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Monthly Price ($)
+                Plan Currency
+              </label>
+              <select
+                value={currentPlan.currency || 'INR'}
+                onChange={(e) => {
+                  const conf = getCurrencyConfig(e.target.value);
+                  setCurrentPlan({
+                    ...currentPlan,
+                    currency: conf.code,
+                    currencySymbol: conf.symbol,
+                  });
+                }}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold bg-white cursor-pointer"
+              >
+                {UNIVERSAL_CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.symbol} {c.code}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Monthly Price ({currentPlan.currencySymbol || '₹'})
               </label>
               <input
                 type="number"
@@ -99,7 +125,7 @@ export const PricingPlanModal: React.FC<PricingPlanModalProps> = ({
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Yearly Price ($)
+                Yearly Price ({currentPlan.currencySymbol || '₹'})
               </label>
               <input
                 type="number"

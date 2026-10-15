@@ -14,7 +14,17 @@ import {
   X,
   Save,
   CheckCircle2,
+  Key,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  Copy,
+  Check,
 } from 'lucide-react';
+import { useApp } from '../../../context/AppContext';
+import { formatUniversalPrice } from '../../../utils/currency';
+
+const generateSecurePassword = () => 'OrgPass#' + Math.floor(1000 + Math.random() * 9000);
 
 interface EditCompanyModalProps {
   company: CompanyAdminMetric | null;
@@ -29,13 +39,17 @@ export const EditCompanyModal: React.FC<EditCompanyModalProps> = ({
   onClose,
   onSave,
 }) => {
+  const { pricingPlans, selectedCurrency } = useApp();
   const [formData, setFormData] = useState<Partial<CompanyAdminMetric>>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [copiedPassword, setCopiedPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (company) {
       setFormData({
         ...company,
+        password: company.password || 'Acme@123',
         phone: company.phone || '+1 (555) 000-0000',
         website: company.website || 'https://omnisuite.io',
         industry: company.industry || 'Enterprise Software & Logistics',
@@ -68,6 +82,7 @@ export const EditCompanyModal: React.FC<EditCompanyModalProps> = ({
       companyName: formData.companyName.trim(),
       adminName: formData.adminName.trim(),
       adminEmail: formData.adminEmail.trim(),
+      password: formData.password?.trim() || company.password,
       phone: formData.phone?.trim() || '+1 (555) 000-0000',
       website: formData.website?.trim() || 'https://omnisuite.io',
       industry: formData.industry || 'Enterprise Software & Logistics',
@@ -168,6 +183,69 @@ export const EditCompanyModal: React.FC<EditCompanyModalProps> = ({
               />
             </div>
 
+            {/* Admin Password & Password Generator */}
+            <div className="sm:col-span-2 space-y-1.5 bg-blue-50/60 p-3.5 rounded-xl border border-blue-200/80">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-blue-950 flex items-center space-x-1.5">
+                  <Key className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Admin Login Password</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setFormData((prev) => ({ ...prev, password: generateSecurePassword() }))}
+                  className="text-[11px] font-bold text-blue-700 hover:text-blue-900 flex items-center space-x-1 bg-white hover:bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 transition-colors shadow-2xs cursor-pointer"
+                  title="Generate a fresh secure random password"
+                >
+                  <RefreshCw className="w-3 h-3 text-blue-600" />
+                  <span>Generate Password</span>
+                </button>
+              </div>
+              <div className="relative flex items-center">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.password || ''}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="e.g. OrgPass#4921"
+                  className="w-full pl-3 pr-20 py-2 text-xs font-mono font-bold tracking-wider border border-blue-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-blue-500 bg-white text-slate-900 shadow-2xs"
+                />
+                <div className="absolute right-2 flex items-center space-x-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (formData.password) {
+                        navigator.clipboard.writeText(formData.password);
+                        setCopiedPassword(true);
+                        setTimeout(() => setCopiedPassword(false), 2000);
+                      }
+                    }}
+                    className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                    title="Copy password to clipboard"
+                  >
+                    {copiedPassword ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-600 font-bold" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-3.5 h-3.5" />
+                    ) : (
+                      <Eye className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-500">
+                Updating this will change the password used by this organization administrator to access their tenant.
+              </p>
+            </div>
+
             {/* Phone */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-700 flex items-center space-x-1.5">
@@ -211,20 +289,53 @@ export const EditCompanyModal: React.FC<EditCompanyModalProps> = ({
               />
             </div>
 
-            {/* Tier */}
+            {/* Tier - Synced with Pricing & Plans */}
             <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 flex items-center space-x-1.5">
-                <Layers className="w-3.5 h-3.5 text-slate-400" />
-                <span>Subscription Plan Tier</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 flex items-center space-x-1.5">
+                  <Layers className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Subscription Plan Tier</span>
+                </label>
+                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                  Synced
+                </span>
+              </div>
               <select
                 value={formData.tier || 'Enterprise'}
-                onChange={(e) => setFormData({ ...formData, tier: e.target.value as any })}
-                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-blue-500 bg-slate-50/50"
+                onChange={(e) => {
+                  const nextTier = e.target.value;
+                  const matchedPlan = pricingPlans.find((p) => p.name === nextTier);
+                  setFormData({
+                    ...formData,
+                    tier: nextTier,
+                    whatsappEnabled: matchedPlan ? matchedPlan.whatsAppIntegration : formData.whatsappEnabled,
+                    emailEnabled: matchedPlan ? matchedPlan.emailAlerts : formData.emailEnabled,
+                  });
+                }}
+                className="w-full px-3 py-2 text-xs border border-blue-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-blue-500 bg-white font-medium"
               >
-                <option value="Starter">Starter Tier</option>
-                <option value="Growth">Growth Tier</option>
-                <option value="Enterprise">Enterprise Tier</option>
+                {pricingPlans.map((plan) => {
+                  const priceInfo = formatUniversalPrice(
+                    plan.monthlyPrice,
+                    selectedCurrency,
+                    plan.currency || 'INR'
+                  );
+                  return (
+                    <option key={plan.id} value={plan.name}>
+                      {plan.name} Tier &bull; {priceInfo.formatted}/mo (Max {plan.maxUsers} Users &bull; {plan.maxClients} Clients)
+                    </option>
+                  );
+                })}
+                {!pricingPlans.some((p) => p.name.toLowerCase() === (formData.tier || '').toLowerCase()) && formData.tier && (
+                  <option value={formData.tier}>{formData.tier} Tier (Custom)</option>
+                )}
+                {pricingPlans.length === 0 && (
+                  <>
+                    <option value="Enterprise">Enterprise Tier</option>
+                    <option value="Growth">Growth Tier</option>
+                    <option value="Starter">Starter Tier</option>
+                  </>
+                )}
               </select>
             </div>
 

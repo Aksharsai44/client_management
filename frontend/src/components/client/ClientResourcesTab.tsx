@@ -84,6 +84,15 @@ export const ClientResourcesTab: React.FC<ClientResourcesTabProps> = ({
             </div>
           </div>
         ))}
+
+        {batchResources.length === 0 && (
+          <div className="col-span-full p-12 text-center bg-white border border-slate-200 rounded-2xl space-y-2">
+            <h4 className="font-bold text-slate-800 text-sm">No documents shared yet</h4>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              No files or reports have been uploaded for this batch yet. Click &quot;Upload Document&quot; to share deliverables.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CompanyAdminMetric, ClientCompany, User, Batch } from '../../types';
 import { useApp } from '../../context/AppContext';
+import { formatUniversalPrice } from '../../utils/currency';
 import {
   ArrowLeft,
   Building2,
@@ -39,6 +40,7 @@ interface CompanyFullDetailsViewProps {
   onUpdateCompany: (company: CompanyAdminMetric) => void;
   onDeleteCompany: (companyAdminId: string) => void;
   onToggleStatus: (companyAdminId: string) => void;
+  onEdit?: () => void;
 }
 
 export const CompanyFullDetailsView: React.FC<CompanyFullDetailsViewProps> = ({
@@ -47,12 +49,15 @@ export const CompanyFullDetailsView: React.FC<CompanyFullDetailsViewProps> = ({
   onUpdateCompany,
   onDeleteCompany,
   onToggleStatus,
+  onEdit,
 }) => {
   const {
     clientCompanies,
     users,
     batches,
     meetings,
+    pricingPlans,
+    selectedCurrency,
     addClientCompany,
     toggleCompanyIntegration,
     quickSwitchRole,
@@ -118,7 +123,16 @@ export const CompanyFullDetailsView: React.FC<CompanyFullDetailsViewProps> = ({
   );
 
   const isPaused = company.status === 'paused';
-  const storageLimitMb = company.tier === 'Enterprise' ? 2000 : company.tier === 'Growth' ? 1000 : 500;
+  const matchedPlan = pricingPlans.find(
+    (p) => p.name.toLowerCase() === (company.tier || '').toLowerCase()
+  );
+  const storageLimitMb = matchedPlan
+    ? Math.max(500, matchedPlan.maxUsers * 20)
+    : company.tier === 'Enterprise'
+    ? 2000
+    : company.tier === 'Growth'
+    ? 1000
+    : 500;
   const storagePercent = Math.min(100, Math.round(((company.storageUsedMb || 100) / storageLimitMb) * 100));
 
   return (
@@ -165,7 +179,13 @@ export const CompanyFullDetailsView: React.FC<CompanyFullDetailsViewProps> = ({
           </button>
 
           <button
-            onClick={() => setIsEditModalOpen(true)}
+            onClick={() => {
+              if (onEdit) {
+                onEdit();
+              } else {
+                setIsEditModalOpen(true);
+              }
+            }}
             className="px-3 py-1.5 rounded-xl text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors flex items-center space-x-1.5 cursor-pointer"
           >
             <Edit className="w-3.5 h-3.5" />
@@ -426,9 +446,37 @@ export const CompanyFullDetailsView: React.FC<CompanyFullDetailsViewProps> = ({
                 </div>
                 <div>
                   <span className="text-slate-400 font-medium block">Current Subscription Tier</span>
-                  <span className="font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-200 inline-block mt-0.5">
-                    {company.tier || 'Enterprise'} Plan
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <span className="font-bold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200 inline-flex items-center space-x-1.5">
+                      <Layers className="w-3.5 h-3.5 text-purple-600" />
+                      <span>{company.tier || 'Enterprise'} Plan</span>
+                    </span>
+                    {matchedPlan && (
+                      <span className="text-xs font-black text-indigo-900 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200">
+                        {
+                          formatUniversalPrice(
+                            matchedPlan.monthlyPrice,
+                            selectedCurrency,
+                            matchedPlan.currency || 'INR'
+                          ).formatted
+                        }
+                        /month
+                      </span>
+                    )}
+                  </div>
+                  {matchedPlan && (
+                    <div className="mt-2 text-[11px] text-slate-500 space-y-1">
+                      {matchedPlan.tagline && (
+                        <p className="italic text-slate-600">&ldquo;{matchedPlan.tagline}&rdquo;</p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-3 pt-1 text-slate-700 font-medium">
+                        <span>👥 Max <strong>{matchedPlan.maxUsers}</strong> Users</span>
+                        <span>🏢 Max <strong>{matchedPlan.maxClients}</strong> Clients</span>
+                        <span>💬 WhatsApp: <strong>{matchedPlan.whatsAppIntegration ? 'Included' : 'None'}</strong></span>
+                        <span>📧 Email: <strong>{matchedPlan.emailAlerts ? 'Included' : 'None'}</strong></span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -37,20 +37,27 @@ export const CompanyAdminHeader: React.FC<CompanyAdminHeaderProps> = ({
       </div>
 
       {/* Batch Switcher dropdown in header */}
-      <div className="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
-        <span className="text-xs font-semibold text-slate-600 pl-2">Switch Batch:</span>
-        <select
-          value={activeBatchId}
-          onChange={(e) => setActiveBatchId(e.target.value)}
-          className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs font-bold text-slate-800 focus:outline-none"
-        >
-          {batches.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {batches && batches.length > 0 ? (
+        <div className="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+          <span className="text-xs font-semibold text-slate-600 pl-2">Cohort / Batch:</span>
+          <select
+            value={activeBatchId}
+            onChange={(e) => setActiveBatchId(e.target.value)}
+            className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs font-bold text-slate-800 focus:outline-none"
+          >
+            {batches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div className="flex items-center space-x-2 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 text-amber-800 text-xs font-semibold">
+          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+          <span>Fresh Tenant Workspace &bull; 0 Batches Active</span>
+        </div>
+      )}
     </div>
   );
 };

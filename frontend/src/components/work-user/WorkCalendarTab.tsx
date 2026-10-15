@@ -62,6 +62,12 @@ export const WorkCalendarTab: React.FC<WorkCalendarTabProps> = ({
               </div>
             );
           })}
+
+          {batchMeetings.length === 0 && (
+            <div className="p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-xl">
+              No meetings or checkpoint sessions scheduled yet for this batch.
+            </div>
+          )}
         </div>
       </div>
     </div>

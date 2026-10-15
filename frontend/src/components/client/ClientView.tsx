@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { User } from '../../types';
+import { User, Batch } from '../../types';
 import { AttendanceReportModal } from '../common/AttendanceReportModal';
 import { ClientHeader } from './ClientHeader';
 import { ClientDashboardTab } from './ClientDashboardTab';
@@ -39,37 +39,124 @@ export const ClientView: React.FC = () => {
     companySettings,
   } = useApp();
 
-  // Active batch
-  const currentBatch = batches.find((b) => b.id === activeBatchId) || batches[0];
+  // 1. Scoped batches for this client organization
+  const scopedBatches = useMemo(() => {
+    const matching = batches.filter((b) => {
+      if (currentUser.batchIds && currentUser.batchIds.includes(b.id)) return true;
+      if (currentUser.companyId && b.companyId === currentUser.companyId) return true;
+      if (
+        currentUser.companyName &&
+        b.name &&
+        b.name.toLowerCase().includes(currentUser.companyName.toLowerCase())
+      ) {
+        return true;
+      }
+      return false;
+    });
 
-  // User client batches
-  const userBatches = batches.filter((b) => currentUser.batchIds?.includes(b.id));
+    if (matching.length > 0) return matching;
 
-  // Batch-filtered datasets
-  const batchMeetings = useMemo(
-    () => meetings.filter((m) => m.batchId === activeBatchId),
-    [meetings, activeBatchId]
-  );
-  const batchUsers = useMemo(
-    () => users.filter((u) => u.batchIds?.includes(activeBatchId)),
-    [users, activeBatchId]
-  );
-  const batchPosts = useMemo(
-    () => communityPosts.filter((p) => p.batchId === activeBatchId),
-    [communityPosts, activeBatchId]
-  );
-  const batchResources = useMemo(
-    () => resources.filter((r) => r.batchId === activeBatchId),
-    [resources, activeBatchId]
-  );
+    const primaryBatchId =
+      currentUser.batchIds?.[0] ||
+      (currentUser.companyId ? `batch_${currentUser.companyId}` : 'batch_primary');
 
-  // Dynamic attendance index
+    return [
+      {
+        id: primaryBatchId,
+        name: currentUser.companyName
+          ? `${currentUser.companyName} - Client Group`
+          : 'Client Group',
+        code: 'BAT-01',
+        companyId: currentUser.companyId || '',
+        description: `Dedicated client group workspace for ${currentUser.companyName || 'your organization'}.`,
+        clientCount: 1,
+        workerCount: 0,
+        startDate: new Date().toISOString().split('T')[0],
+        status: 'active' as const,
+        leadAdminId: currentUser.companyId || currentUser.id,
+      },
+    ];
+  }, [batches, currentUser]);
+
+  // Current active batch (strictly guaranteed to be within scopedBatches!)
+  const currentBatch = useMemo(() => {
+    return (
+      scopedBatches.find((b) => b.id === activeBatchId) ||
+      scopedBatches[0]
+    );
+  }, [scopedBatches, activeBatchId]);
+
+  // Sync activeBatchId to client's own batch
+  useEffect(() => {
+    if (currentBatch && activeBatchId !== currentBatch.id) {
+      setActiveBatchId(currentBatch.id);
+    }
+  }, [currentBatch, activeBatchId, setActiveBatchId]);
+
+  const userBatches = scopedBatches;
+
+  // 2. Real Batch Users: ONLY real users added to this organization/batch manually
+  const batchUsers = useMemo(() => {
+    return users.filter((u) => {
+      // Never show platform product admins
+      if (u.role === 'product_super_admin' || u.role === 'product_admin') return false;
+
+      // Match by companyId or companyName or batch
+      const matchesCompany =
+        currentUser.companyId && u.companyId === currentUser.companyId;
+      const matchesCompanyName =
+        currentUser.companyName &&
+        u.companyName &&
+        currentUser.companyName.toLowerCase().trim() === u.companyName.toLowerCase().trim();
+      const matchesBatch =
+        currentBatch.id && u.batchIds?.includes(currentBatch.id);
+
+      return Boolean(matchesCompany || matchesCompanyName || matchesBatch);
+    });
+  }, [users, currentUser, currentBatch.id]);
+
+  // 3. Real Meetings: ONLY meetings scheduled for this batch or organization
+  const batchMeetings = useMemo(() => {
+    return meetings.filter((m) => {
+      if (m.batchId === currentBatch.id) return true;
+      if (currentUser.companyId && m.companyId === currentUser.companyId) return true;
+      return false;
+    });
+  }, [meetings, currentBatch.id, currentUser.companyId]);
+
+  // 4. Real Community Posts: ONLY posts created for this batch or by company members
+  const batchPosts = useMemo(() => {
+    const allowedUserIds = new Set(batchUsers.map((u) => u.id));
+    allowedUserIds.add(currentUser.id);
+    if (currentUser.companyId) allowedUserIds.add(currentUser.companyId);
+
+    return communityPosts.filter((p) => {
+      if (p.batchId === currentBatch.id) return true;
+      if (allowedUserIds.has(p.authorId)) return true;
+      return false;
+    });
+  }, [communityPosts, currentBatch.id, batchUsers, currentUser]);
+
+  // 5. Real Resources: ONLY resources uploaded for this batch or by company members
+  const batchResources = useMemo(() => {
+    const allowedUserIds = new Set(batchUsers.map((u) => u.id));
+    allowedUserIds.add(currentUser.id);
+    if (currentUser.companyId) allowedUserIds.add(currentUser.companyId);
+
+    return resources.filter((r) => {
+      if (r.batchId === currentBatch.id) return true;
+      if (r.uploaderId && allowedUserIds.has(r.uploaderId)) return true;
+      return false;
+    });
+  }, [resources, currentBatch.id, batchUsers, currentUser]);
+
+  // 6. Real Attendance Records
   const clientRecords = useMemo(
     () =>
       attendanceRecords.filter(
-        (r) => r.userId === currentUser.id && r.batchId === activeBatchId
+        (r) => r.userId === currentUser.id && r.batchId === currentBatch.id
       ),
-    [attendanceRecords, currentUser.id, activeBatchId]
+    [attendanceRecords, currentUser.id, currentBatch.id]
   );
   const clientAttendedCount = clientRecords.filter((r) => r.status === 'present').length;
   const clientAttendanceRate =
@@ -199,7 +286,7 @@ export const ClientView: React.FC = () => {
 
       {/* 9. CLIENT PROFILE TAB */}
       {activeTab === 'profile' && (
-        <ClientProfileTab currentUser={currentUser} batches={batches} />
+        <ClientProfileTab currentUser={currentUser} batches={userBatches} />
       )}
 
       {/* MODALS */}

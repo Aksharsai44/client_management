@@ -79,6 +79,18 @@ export const ViewUserDetailsModal: React.FC<ViewUserDetailsModalProps> = ({
             <span className="text-slate-700">{viewingUser.joinedDate || '2026-01-15'}</span>
           </div>
           <div className="flex justify-between py-1.5 border-b border-slate-100">
+            <span className="text-slate-500">Portal User ID</span>
+            <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+              {viewingUser.id}
+            </span>
+          </div>
+          <div className="flex justify-between py-1.5 border-b border-slate-100">
+            <span className="text-slate-500">Login Password</span>
+            <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+              {viewingUser.password || 'OmniDefault@2026'}
+            </span>
+          </div>
+          <div className="flex justify-between py-1.5 border-b border-slate-100">
             <span className="text-slate-500">Account Status</span>
             <span
               className={`font-bold capitalize ${

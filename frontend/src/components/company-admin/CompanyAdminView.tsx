@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { User, ClientCompany } from '../../types';
+import { User, ClientCompany, Batch } from '../../types';
+import { Sparkles, Building, Video, Users, FileText } from 'lucide-react';
 import { AttendanceReportModal } from '../common/AttendanceReportModal';
 import { CompanyAdminHeader } from './CompanyAdminHeader';
 import { CompanyDashboardTab } from './CompanyDashboardTab';
@@ -54,33 +55,136 @@ export const CompanyAdminView: React.FC = () => {
     updateCompanySettings,
   } = useApp();
 
-  // Active batch object
-  const currentBatch = batches.find((b) => b.id === activeBatchId) || batches[0];
+  // Filter batches scoped to current company organization
+  const scopedBatches = useMemo(() => {
+    if (!currentUser) return [];
+    if (currentUser.role === 'product_super_admin' || currentUser.role === 'product_admin') {
+      return batches;
+    }
+    const filtered = batches.filter((b) => {
+      if (currentUser.companyId && b.companyId === currentUser.companyId) return true;
+      if (b.leadAdminId === currentUser.id) return true;
+      if (
+        currentUser.companyName &&
+        currentUser.companyName.toLowerCase().includes('acme') &&
+        b.companyId === 'comp_acme'
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    if (filtered.length === 0) {
+      const primaryBatchId = currentUser.companyId ? `batch_${currentUser.companyId}` : 'batch_primary';
+      return [
+        {
+          id: primaryBatchId,
+          name: currentUser.companyName ? `${currentUser.companyName} - Primary Cohort` : 'Primary Cohort',
+          code: 'BAT-01',
+          companyId: currentUser.companyId || '',
+          description: 'Primary onboarding cohort for clients and team members.',
+          clientCount: 0,
+          workerCount: 0,
+          startDate: new Date().toISOString().split('T')[0],
+          status: 'active' as const,
+          leadAdminId: currentUser.id,
+        },
+      ];
+    }
+    return filtered;
+  }, [batches, currentUser]);
+
+  const defaultEmptyBatch: Batch = useMemo(
+    () => ({
+      id: currentUser?.companyId ? `batch_${currentUser.companyId}` : 'batch_primary',
+      name: currentUser?.companyName ? `${currentUser.companyName} (Primary Cohort)` : 'Primary Cohort',
+      code: 'BAT-01',
+      companyId: currentUser?.companyId || '',
+      description: 'Primary onboarding cohort for clients and team members.',
+      clientCount: 0,
+      workerCount: 0,
+      startDate: new Date().toISOString().split('T')[0],
+      status: 'active' as const,
+      leadAdminId: currentUser?.id || '',
+    }),
+    [currentUser]
+  );
+
+  const currentBatch = scopedBatches.find((b) => b.id === activeBatchId) || scopedBatches[0] || defaultEmptyBatch;
+
+  // Sync activeBatchId if scoped batches change
+  useEffect(() => {
+    if (scopedBatches.length > 0 && !scopedBatches.some((b) => b.id === activeBatchId)) {
+      setActiveBatchId(scopedBatches[0].id);
+    }
+  }, [scopedBatches, activeBatchId, setActiveBatchId]);
+
+  // Scoped batch data: strictly isolate to activeBatchId when it belongs to scoped batches
+  const isBatchActiveInScope = Boolean(activeBatchId && scopedBatches.some((b) => b.id === activeBatchId));
+
+  const batchMeetings = useMemo(
+    () =>
+      isBatchActiveInScope
+        ? meetings.filter(
+            (m) =>
+              m.batchId === activeBatchId ||
+              (currentUser?.companyId && m.companyId === currentUser.companyId)
+          )
+        : [],
+    [meetings, activeBatchId, isBatchActiveInScope, currentUser]
+  );
+  const batchUsers = useMemo(() => {
+    if (isBatchActiveInScope) {
+      return users.filter(
+        (u) =>
+          u.batchIds?.includes(activeBatchId) ||
+          (currentUser?.companyId && u.companyId === currentUser.companyId && u.role !== 'company_admin')
+      );
+    }
+    if (currentUser?.companyId) {
+      return users.filter((u) => u.companyId === currentUser.companyId && u.role !== 'company_admin');
+    }
+    return [];
+  }, [users, activeBatchId, isBatchActiveInScope, currentUser]);
+
+  const batchCompanies = useMemo(() => {
+    if (isBatchActiveInScope) {
+      return clientCompanies.filter(
+        (c) =>
+          c.batchId === activeBatchId ||
+          (currentUser?.companyId && c.companyId === currentUser.companyId)
+      );
+    }
+    if (currentUser?.companyId) {
+      return clientCompanies.filter((c) => c.companyId === currentUser.companyId);
+    }
+    return [];
+  }, [clientCompanies, activeBatchId, isBatchActiveInScope, currentUser]);
+  const batchPosts = useMemo(
+    () =>
+      isBatchActiveInScope
+        ? communityPosts.filter(
+            (p) =>
+              p.batchId === activeBatchId ||
+              (currentUser?.companyId && p.companyId === currentUser.companyId)
+          )
+        : [],
+    [communityPosts, activeBatchId, isBatchActiveInScope, currentUser]
+  );
+  const batchResources = useMemo(
+    () =>
+      isBatchActiveInScope
+        ? resources.filter(
+            (r) =>
+              r.batchId === activeBatchId ||
+              (currentUser?.companyId && r.companyId === currentUser.companyId)
+          )
+        : [],
+    [resources, activeBatchId, isBatchActiveInScope, currentUser]
+  );
 
   // Attendance report modal user
   const [reportUser, setReportUser] = useState<User | null>(null);
-
-  // Filtered batch data
-  const batchMeetings = useMemo(
-    () => meetings.filter((m) => m.batchId === activeBatchId),
-    [meetings, activeBatchId]
-  );
-  const batchUsers = useMemo(
-    () => users.filter((u) => u.batchIds?.includes(activeBatchId)),
-    [users, activeBatchId]
-  );
-  const batchCompanies = useMemo(
-    () => clientCompanies.filter((c) => c.batchId === activeBatchId),
-    [clientCompanies, activeBatchId]
-  );
-  const batchPosts = useMemo(
-    () => communityPosts.filter((p) => p.batchId === activeBatchId),
-    [communityPosts, activeBatchId]
-  );
-  const batchResources = useMemo(
-    () => resources.filter((r) => r.batchId === activeBatchId),
-    [resources, activeBatchId]
-  );
 
   // Modal triggers
   const [isAddClientModal, setIsAddClientModal] = useState(false);
@@ -192,11 +296,36 @@ export const CompanyAdminView: React.FC = () => {
           : 'p-6 max-w-7xl mx-auto space-y-6'
       }
     >
+      {/* Isolated Workspace Welcome Banner for Fresh Organizations */}
+      {scopedBatches.length === 0 && (
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-white border border-indigo-200 text-indigo-600 flex items-center justify-center font-bold shadow-2xs shrink-0">
+              <Sparkles className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm">
+                Isolated Tenant Workspace &bull; {currentUser?.companyName || 'Organization Admin'}
+              </h3>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Welcome! This organization is fully isolated with 0 pre-populated records. All workspace data starts completely clean and dedicated to your company.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsAddClientModal(true)}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shrink-0 transition-colors cursor-pointer shadow-2xs flex items-center space-x-1.5 self-start sm:self-center"
+          >
+            <span>+ Add First Client</span>
+          </button>
+        </div>
+      )}
+
       {/* Batch Header Bar - Only visible on Dashboard tab */}
       {activeTab === 'dashboard' && (
         <CompanyAdminHeader
           currentBatch={currentBatch}
-          batches={batches}
+          batches={scopedBatches}
           activeBatchId={activeBatchId}
           setActiveBatchId={setActiveBatchId}
         />
@@ -334,7 +463,7 @@ export const CompanyAdminView: React.FC = () => {
         isOpen={isAddClientModal}
         onClose={() => setIsAddClientModal(false)}
         onAdd={(clientCompany) => addClientCompany(clientCompany)}
-        activeBatchId={activeBatchId}
+        activeBatchId={activeBatchId || currentBatch.id}
       />
 
       {editingClientCompany && (
@@ -350,8 +479,9 @@ export const CompanyAdminView: React.FC = () => {
         isOpen={isAddUserModal}
         onClose={() => setIsAddUserModal(false)}
         onAdd={(u) => addUser(u)}
-        activeBatchId={activeBatchId}
+        activeBatchId={activeBatchId || currentBatch.id}
         companySettings={companySettings}
+        clientCompanies={batchCompanies}
       />
 
       <ViewUserDetailsModal

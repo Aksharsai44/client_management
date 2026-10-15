@@ -56,6 +56,12 @@ export const WorkGroupsTab: React.FC<WorkGroupsTabProps> = ({
               </button>
             </div>
           ))}
+
+          {batchUsers.length === 0 && (
+            <div className="col-span-full p-8 text-center text-slate-400 text-xs bg-slate-50 rounded-xl">
+              No teammates assigned to this group yet.
+            </div>
+          )}
         </div>
       </div>
     </div>

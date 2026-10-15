@@ -212,6 +212,21 @@ export const INITIAL_CLIENT_COMPANIES: ClientCompany[] = [
     createdAt: '2026-02-05',
     status: 'active',
   },
+  {
+    id: 'client_comp_4',
+    name: 'BioCare Health Diagnostics',
+    clientName: 'Dr. Raymond Scott',
+    email: 'raymond.scott@biocare-health.io',
+    phone: '+1 (555) 789-1234',
+    description: 'Clinical telemetry integration and HIPAA-audited alert automation.',
+    websiteUrl: 'https://biocare-health.io',
+    documents: [
+      { name: 'HIPAA_Compliance_Cert.pdf', url: '#', size: '1.8 MB' },
+    ],
+    batchId: 'batch_gamma',
+    createdAt: '2026-02-15',
+    status: 'active',
+  },
 ];
 
 export const INITIAL_PRICING_PLANS: PricingPlan[] = [
@@ -219,8 +234,10 @@ export const INITIAL_PRICING_PLANS: PricingPlan[] = [
     id: 'plan_starter',
     name: 'Starter Tier',
     tagline: 'Ideal for emerging teams & small client batches',
-    monthlyPrice: 49,
-    yearlyPrice: 470,
+    monthlyPrice: 3999,
+    yearlyPrice: 38000,
+    currency: 'INR',
+    currencySymbol: '₹',
     features: [
       'Up to 15 Active Portal Users',
       '2 Dedicated Client Batches',
@@ -240,8 +257,10 @@ export const INITIAL_PRICING_PLANS: PricingPlan[] = [
     id: 'plan_pro',
     name: 'Enterprise Professional',
     tagline: 'Full collaborative power with AI transcripts and WhatsApp integration',
-    monthlyPrice: 149,
-    yearlyPrice: 1420,
+    monthlyPrice: 11999,
+    yearlyPrice: 115000,
+    currency: 'INR',
+    currencySymbol: '₹',
     popular: true,
     features: [
       'Up to 100 Active Portal Users',
@@ -264,8 +283,10 @@ export const INITIAL_PRICING_PLANS: PricingPlan[] = [
     id: 'plan_custom',
     name: 'Corporate Unlimited',
     tagline: 'Tailored for large organizations with custom SLA and dedicated infrastructure',
-    monthlyPrice: 399,
-    yearlyPrice: 3800,
+    monthlyPrice: 31999,
+    yearlyPrice: 305000,
+    currency: 'INR',
+    currencySymbol: '₹',
     features: [
       'Unlimited Users, Clients & Workers',
       'Multi-Level Product & Sub-Admin Delegation',
@@ -758,6 +779,7 @@ export const INITIAL_COMPANY_ADMIN_METRICS: CompanyAdminMetric[] = [
     companyName: 'Acme Enterprise Solutions',
     adminName: 'Marcus Sterling',
     adminEmail: 'admin@acmecorp.com',
+    password: 'Acme@123',
     phone: '+1 (555) 234-5678',
     website: 'https://acmecorp.com',
     industry: 'Enterprise Cloud Logistics & Infrastructure',
@@ -777,6 +799,7 @@ export const INITIAL_COMPANY_ADMIN_METRICS: CompanyAdminMetric[] = [
     companyName: 'Apex HealthTech Labs',
     adminName: 'Priya Sharma',
     adminEmail: 'priya@apexlabs.com',
+    password: 'Apex@123',
     phone: '+1 (555) 987-6543',
     website: 'https://apexhealthlabs.io',
     industry: 'Healthcare AI & Clinical Trial Telemetry',
@@ -799,6 +822,7 @@ export const INITIAL_INTEGRATION_SETTINGS: IntegrationSettings = {
   apiKey: 'AIzaSyA4EXAMPLE_MOCK_GEMINI_KEY_2026',
   whatsappEnabledGlobal: true,
   emailAlertsGlobal: true,
+  demoWhatsappNumber: '+1 (555) 019-2831',
   companySettings: {
     comp_acme: {
       whatsappEnabled: true,
@@ -806,6 +830,24 @@ export const INITIAL_INTEGRATION_SETTINGS: IntegrationSettings = {
     },
     comp_apex: {
       whatsappEnabled: false,
+      emailEnabled: true,
+    },
+  },
+  clientSettings: {
+    client_comp_1: {
+      whatsappEnabled: true,
+      emailEnabled: true,
+    },
+    client_comp_2: {
+      whatsappEnabled: false,
+      emailEnabled: true,
+    },
+    client_comp_3: {
+      whatsappEnabled: true,
+      emailEnabled: false,
+    },
+    client_comp_4: {
+      whatsappEnabled: true,
       emailEnabled: true,
     },
   },

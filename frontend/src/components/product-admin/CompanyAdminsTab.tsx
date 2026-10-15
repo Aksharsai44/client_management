@@ -16,9 +16,12 @@ import {
   ExternalLink,
   Layers,
   Users,
+  Key,
+  Copy,
+  Check,
 } from 'lucide-react';
-import { AddCompanyModal } from './modals/AddCompanyModal';
-import { EditCompanyModal } from './modals/EditCompanyModal';
+import { AddCompanyFullPageView } from './AddCompanyFullPageView';
+import { EditCompanyFullPageView } from './EditCompanyFullPageView';
 import { DeleteCompanyModal } from './modals/DeleteCompanyModal';
 import { CompanyFullDetailsView } from './CompanyFullDetailsView';
 
@@ -39,6 +42,7 @@ export const CompanyAdminsTab: React.FC<CompanyAdminsTabProps> = ({
     deleteCompanyAdminMetric,
     toggleCompanyStatus,
     companyAdminMetrics,
+    pricingPlans,
   } = useApp();
 
   // Full-page detailed view state
@@ -47,12 +51,13 @@ export const CompanyAdminsTab: React.FC<CompanyAdminsTabProps> = ({
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused'>('all');
-  const [tierFilter, setTierFilter] = useState<'all' | 'Starter' | 'Growth' | 'Enterprise'>('all');
+  const [tierFilter, setTierFilter] = useState<string>('all');
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<CompanyAdminMetric | null>(null);
   const [deletingCompany, setDeletingCompany] = useState<CompanyAdminMetric | null>(null);
+  const [copiedPassOrgId, setCopiedPassOrgId] = useState<string | null>(null);
 
   // Sync current list from AppContext (scoped if regular admin)
   const sourceList = isSuperAdmin
@@ -72,7 +77,9 @@ export const CompanyAdminsTab: React.FC<CompanyAdminsTabProps> = ({
       (statusFilter === 'active' && company.status !== 'paused') ||
       (statusFilter === 'paused' && company.status === 'paused');
 
-    const matchesTier = tierFilter === 'all' || (company.tier || 'Enterprise') === tierFilter;
+    const matchesTier =
+      tierFilter === 'all' ||
+      (company.tier || 'Enterprise').toLowerCase() === tierFilter.toLowerCase();
 
     return matchesSearch && matchesStatus && matchesTier;
   });
@@ -82,12 +89,43 @@ export const CompanyAdminsTab: React.FC<CompanyAdminsTabProps> = ({
     ? companyAdminMetrics.find((c) => c.companyAdminId === selectedCompanyId) || null
     : null;
 
-  // If a company is selected, show the Full Page Detailed View
+  // 1. If Add Company is active, show the Full Page Add Company View! (Super Admin only)
+  if (isAddModalOpen && isSuperAdmin) {
+    return (
+      <AddCompanyFullPageView
+        onBack={() => setIsAddModalOpen(false)}
+        onAdd={(newCompany) => {
+          addCompanyAdminMetric(newCompany);
+          setIsAddModalOpen(false);
+        }}
+      />
+    );
+  }
+
+  // 2. If Edit Company is active, show the Full Page Edit Company View!
+  if (editingCompany) {
+    return (
+      <EditCompanyFullPageView
+        company={editingCompany}
+        onBack={() => setEditingCompany(null)}
+        onSave={(updated) => {
+          updateCompanyAdminMetric(updated);
+          setEditingCompany(null);
+        }}
+      />
+    );
+  }
+
+  // 3. If a company is selected (clicked Eye icon or View Full Details), show the Full Page Detailed View!
   if (currentSelectedCompany) {
     return (
       <CompanyFullDetailsView
         company={currentSelectedCompany}
         onBack={() => setSelectedCompanyId(null)}
+        onEdit={() => {
+          setEditingCompany(currentSelectedCompany);
+          setSelectedCompanyId(null);
+        }}
         onUpdateCompany={(updated) => updateCompanyAdminMetric(updated)}
         onDeleteCompany={(id) => {
           deleteCompanyAdminMetric(id);
@@ -131,14 +169,16 @@ export const CompanyAdminsTab: React.FC<CompanyAdminsTabProps> = ({
             </span>
           )}
 
-          {/* Primary Action: Add Company */}
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-md transition-all flex items-center space-x-2 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Company Organization</span>
-          </button>
+          {/* Primary Action: Add Company (Restricted to Product Super Admin only) */}
+          {isSuperAdmin && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-md transition-all flex items-center space-x-2 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Company Organization</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -194,16 +234,23 @@ export const CompanyAdminsTab: React.FC<CompanyAdminsTabProps> = ({
             <option value="paused">Paused Only</option>
           </select>
 
-          {/* Tier Filter */}
+          {/* Tier Filter - Synced with Pricing & Plans */}
           <select
             value={tierFilter}
-            onChange={(e) => setTierFilter(e.target.value as any)}
-            className="px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+            onChange={(e) => setTierFilter(e.target.value)}
+            className="px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-semibold"
           >
-            <option value="all">All Tiers</option>
-            <option value="Enterprise">Enterprise Tier</option>
-            <option value="Growth">Growth Tier</option>
-            <option value="Starter">Starter Tier</option>
+            <option value="all">All Plan Tiers</option>
+            {pricingPlans.map((plan) => {
+              const count = companyAdminMetrics.filter(
+                (c) => (c.tier || 'Enterprise').toLowerCase() === plan.name.toLowerCase()
+              ).length;
+              return (
+                <option key={plan.id} value={plan.name}>
+                  {plan.name} Tier ({count})
+                </option>
+              );
+            })}
           </select>
         </div>
       </div>
@@ -215,15 +262,21 @@ export const CompanyAdminsTab: React.FC<CompanyAdminsTabProps> = ({
           <div>
             <h4 className="font-bold text-slate-800 text-sm">No company organizations found</h4>
             <p className="text-xs text-slate-500">
-              {searchQuery ? 'Try adjusting your search filters' : 'Get started by creating your first company tenant'}
+              {searchQuery
+                ? 'Try adjusting your search filters'
+                : isSuperAdmin
+                ? 'Get started by creating your first company tenant'
+                : 'No company organizations are currently assigned to your account. Please contact your Product Super Admin.'}
             </p>
           </div>
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-colors cursor-pointer"
-          >
-            + Add Company Organization
-          </button>
+          {isSuperAdmin && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-colors cursor-pointer"
+            >
+              + Add Company Organization
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -294,6 +347,50 @@ export const CompanyAdminsTab: React.FC<CompanyAdminsTabProps> = ({
                         <span>{admin.phone}</span>
                       </div>
                     )}
+
+                    {/* Organization Admin Credentials Badge */}
+                    <div className="mt-2.5 bg-indigo-50/50 border border-indigo-100 rounded-xl p-2.5 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 flex items-center space-x-1">
+                          <Key className="w-3 h-3 text-indigo-500" />
+                          <span>Admin Login Credentials</span>
+                        </span>
+                        <span className="text-[9px] font-semibold text-indigo-600 bg-white px-1.5 py-0.2 rounded border border-indigo-150">
+                          Tenant Login
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500 text-[10px]">Email (Login ID):</span>
+                        <span className="font-mono text-slate-800 font-medium truncate max-w-[150px]">
+                          {admin.adminEmail}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500 text-[10px]">Password:</span>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="font-mono font-bold text-slate-800 bg-white px-1.5 py-0.5 rounded border border-indigo-200 text-[11px]">
+                            {admin.password || 'Acme@123'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(admin.password || 'Acme@123');
+                              setCopiedPassOrgId(admin.companyAdminId);
+                              setTimeout(() => setCopiedPassOrgId(null), 2000);
+                            }}
+                            className="p-1 text-slate-400 hover:text-indigo-600 rounded hover:bg-white transition-colors cursor-pointer"
+                            title="Copy admin password"
+                          >
+                            {copiedPassOrgId === admin.companyAdminId ? (
+                              <Check className="w-3 h-3 text-emerald-600 font-bold" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Key Counts Summary */}
@@ -357,30 +454,7 @@ export const CompanyAdminsTab: React.FC<CompanyAdminsTabProps> = ({
         </div>
       )}
 
-      {/* MODALS */}
-      {isAddModalOpen && (
-        <AddCompanyModal
-          isOpen={isAddModalOpen}
-          onClose={() => setIsAddModalOpen(false)}
-          onAdd={(newCompany) => {
-            addCompanyAdminMetric(newCompany);
-            setIsAddModalOpen(false);
-          }}
-        />
-      )}
-
-      {editingCompany && (
-        <EditCompanyModal
-          company={editingCompany}
-          isOpen={!!editingCompany}
-          onClose={() => setEditingCompany(null)}
-          onSave={(updated) => {
-            updateCompanyAdminMetric(updated);
-            setEditingCompany(null);
-          }}
-        />
-      )}
-
+      {/* Delete Confirmation Modal */}
       {deletingCompany && (
         <DeleteCompanyModal
           company={deletingCompany}

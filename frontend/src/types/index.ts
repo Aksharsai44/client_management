@@ -5,6 +5,7 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  password?: string;
   avatar?: string;
   companyId?: string;
   companyName?: string;
@@ -40,6 +41,8 @@ export interface PricingPlan {
   tagline: string;
   monthlyPrice: number;
   yearlyPrice: number;
+  currency?: string;
+  currencySymbol?: string;
   popular?: boolean;
   features: string[];
   maxUsers: number;
@@ -73,6 +76,7 @@ export interface ClientCompany {
   websiteUrl: string;
   documents: { name: string; url: string; size: string }[];
   batchId: string;
+  companyId?: string;
   createdAt: string;
   status: 'active' | 'paused';
 }
@@ -80,6 +84,7 @@ export interface ClientCompany {
 export interface Meeting {
   id: string;
   batchId: string;
+  companyId?: string;
   title: string;
   description: string;
   scheduleType: 'daily' | 'weekly' | 'custom';
@@ -147,6 +152,7 @@ export interface CommunityReply {
 export interface CommunityPost {
   id: string;
   batchId: string;
+  companyId?: string;
   authorId: string;
   authorName: string;
   authorRole: UserRole;
@@ -166,6 +172,7 @@ export interface CommunityPost {
 export interface ChatMessage {
   id: string;
   batchId: string;
+  companyId?: string;
   senderId: string;
   senderName: string;
   senderRole: UserRole;
@@ -184,6 +191,7 @@ export interface ChatMessage {
 export interface ResourceItem {
   id: string;
   batchId: string;
+  companyId?: string;
   title: string;
   description: string;
   uploaderId: string;
@@ -212,6 +220,7 @@ export interface CompanyAdminMetric {
   companyName: string;
   adminName: string;
   adminEmail: string;
+  password?: string;
   totalClients: number;
   totalUsers: number;
   totalBatches: number;
@@ -222,10 +231,12 @@ export interface CompanyAdminMetric {
   phone?: string;
   website?: string;
   industry?: string;
-  tier?: 'Starter' | 'Growth' | 'Enterprise';
+  tier?: string;
   status?: 'active' | 'paused';
   createdAt?: string;
 }
+
+export type CompanyOrganization = CompanyAdminMetric;
 
 export interface IntegrationSettings {
   aiProvider: 'gemini' | 'openai' | 'anthropic';
@@ -233,8 +244,15 @@ export interface IntegrationSettings {
   apiKey: string;
   whatsappEnabledGlobal: boolean;
   emailAlertsGlobal: boolean;
+  demoWhatsappNumber?: string;
   companySettings: {
     [companyId: string]: {
+      whatsappEnabled: boolean;
+      emailEnabled: boolean;
+    };
+  };
+  clientSettings?: {
+    [clientId: string]: {
       whatsappEnabled: boolean;
       emailEnabled: boolean;
     };

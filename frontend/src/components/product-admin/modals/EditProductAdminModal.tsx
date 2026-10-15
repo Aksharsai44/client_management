@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, CompanyAdminMetric } from '../../../types';
-import { ShieldCheck, User as UserIcon, Mail, Phone, Briefcase, CheckSquare, X, Save } from 'lucide-react';
+import { ShieldCheck, User as UserIcon, Mail, Phone, Briefcase, CheckSquare, X, Save, Key, Eye, EyeOff } from 'lucide-react';
 
 interface EditProductAdminModalProps {
   admin: User | null;
@@ -19,6 +19,9 @@ export const EditProductAdminModal: React.FC<EditProductAdminModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [role, setRole] = useState<'product_admin' | 'product_super_admin'>('product_admin');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState('');
   const [designation, setDesignation] = useState('');
   const [status, setStatus] = useState<'active' | 'inactive'>('active');
@@ -28,6 +31,8 @@ export const EditProductAdminModal: React.FC<EditProductAdminModalProps> = ({
     if (admin) {
       setName(admin.name);
       setEmail(admin.email);
+      setRole((admin.role as 'product_admin' | 'product_super_admin') || 'product_admin');
+      setPassword(admin.password || 'AdminPass#2026');
       setPhone(admin.phone || '');
       setDesignation(admin.designation || 'Product Administrator');
       setStatus(admin.status || 'active');
@@ -37,7 +42,7 @@ export const EditProductAdminModal: React.FC<EditProductAdminModalProps> = ({
 
   if (!isOpen || !admin) return null;
 
-  const isSuperAdminUser = admin.role === 'product_super_admin';
+  const isSuperAdminUser = role === 'product_super_admin';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +50,8 @@ export const EditProductAdminModal: React.FC<EditProductAdminModalProps> = ({
       ...admin,
       name,
       email,
+      role,
+      password,
       phone,
       designation,
       status,
@@ -102,6 +109,32 @@ export const EditProductAdminModal: React.FC<EditProductAdminModalProps> = ({
             </div>
           </div>
 
+          {!isSuperAdminUser && (
+            <div>
+              <label className="block font-bold text-slate-700 mb-1 flex items-center space-x-1.5">
+                <Key className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Login Password</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="AdminPass#1234"
+                  className="w-full pl-3 pr-10 py-2 rounded-xl border border-slate-300 font-mono font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-50"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-bold text-slate-700 mb-1">Phone Number</label>
@@ -125,19 +158,42 @@ export const EditProductAdminModal: React.FC<EditProductAdminModalProps> = ({
             </div>
           </div>
 
-          <div>
-            <label className="block font-bold text-slate-700 mb-1">Account Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as any)}
-              className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-50 font-medium"
-            >
-              <option value="active">Active (Access Enabled)</option>
-              <option value="inactive">Inactive (Access Suspended)</option>
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Administrator Role</label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as 'product_admin' | 'product_super_admin')}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-50 font-medium cursor-pointer"
+              >
+                <option value="product_admin">Product Admin (Scoped)</option>
+                <option value="product_super_admin">Product Super Admin (Global)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Account Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as any)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-50 font-medium cursor-pointer"
+              >
+                <option value="active">Active (Access Enabled)</option>
+                <option value="inactive">Inactive (Access Suspended)</option>
+              </select>
+            </div>
           </div>
 
-          {!isSuperAdminUser ? (
+          {isSuperAdminUser ? (
+            <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-purple-900 text-xs flex items-center space-x-2.5">
+              <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
+              <div>
+                <span className="font-bold block">Global Platform Permissions</span>
+                <span className="text-[11px] text-purple-700">
+                  This user has unrestricted access to all company tenants, pricing plans, and integrations.
+                </span>
+              </div>
+            </div>
+          ) : (
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="font-bold text-slate-700">
@@ -196,10 +252,6 @@ export const EditProductAdminModal: React.FC<EditProductAdminModalProps> = ({
                   );
                 })}
               </div>
-            </div>
-          ) : (
-            <div className="p-3 bg-purple-50 text-purple-800 rounded-xl border border-purple-200">
-              <span className="font-bold">Super Admin:</span> Has full global access across all enterprise company organizations.
             </div>
           )}
 

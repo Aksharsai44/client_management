@@ -10,7 +10,7 @@ import {
   Settings,
   User,
   Sliders,
-  DollarSign,
+  Coins,
   Cpu,
   Video,
   FileSpreadsheet,
@@ -20,7 +20,15 @@ import {
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
-  const { currentUser, activeTab, setActiveTab, companySettings } = useApp();
+  const {
+    currentUser,
+    activeTab,
+    setActiveTab,
+    companySettings,
+    demoRequests,
+    companyAdminMetrics,
+    pricingPlans,
+  } = useApp();
 
   interface NavItem {
     id: string;
@@ -33,14 +41,51 @@ export const Sidebar: React.FC = () => {
   const getNavItems = (): NavItem[] => {
     switch (currentUser.role) {
       case 'product_super_admin':
-      case 'product_admin':
         return [
-          { id: 'dashboard', label: 'Platform Overview', icon: LayoutDashboard },
-          { id: 'demo_requests', label: 'Demo Requests', icon: FileSpreadsheet },
-          { id: 'company_admins', label: 'Company Admins', icon: Building2 },
-          { id: 'pricing', label: 'Pricing Plans', icon: DollarSign },
-          { id: 'integrations', label: 'Integrations & Settings', icon: Sliders },
+          {
+            id: 'demo_requests',
+            label: 'Demo Requests',
+            icon: FileSpreadsheet,
+            badge: demoRequests.filter((r) => r.status === 'pending').length || undefined,
+          },
+          {
+            id: 'company_admins',
+            label: 'Company Admins',
+            icon: Building2,
+            badge: companyAdminMetrics.length,
+          },
+          {
+            id: 'pricing',
+            label: 'Pricing Plans',
+            icon: Coins,
+            badge: pricingPlans.length,
+          },
+          {
+            id: 'integrations',
+            label: 'Product Admins & Integrations',
+            icon: Sliders,
+          },
         ];
+
+      case 'product_admin': {
+        const assignedCount = companyAdminMetrics.filter((m) =>
+          currentUser.assignedCompanyAdminIds?.includes(m.companyAdminId)
+        ).length;
+        return [
+          {
+            id: 'demo_requests',
+            label: 'Demo Requests',
+            icon: FileSpreadsheet,
+            badge: demoRequests.filter((r) => r.status === 'pending').length || undefined,
+          },
+          {
+            id: 'company_admins',
+            label: 'Assigned Companies',
+            icon: Building2,
+            badge: assignedCount,
+          },
+        ];
+      }
 
       case 'company_admin':
         return [
@@ -104,7 +149,9 @@ export const Sidebar: React.FC = () => {
       <nav className="flex-1 px-3 pt-1.5 pb-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = activeTab === item.id;
+          const isProductRole = currentUser.role === 'product_super_admin' || currentUser.role === 'product_admin';
+          const effectiveActiveTab = (isProductRole && activeTab === 'dashboard') ? 'demo_requests' : activeTab;
+          const isActive = effectiveActiveTab === item.id;
           return (
             <button
               key={item.id}

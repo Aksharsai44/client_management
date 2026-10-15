@@ -9,6 +9,7 @@ import {
   Briefcase,
   ShieldCheck,
   LogOut,
+  FileText,
 } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
@@ -169,6 +170,19 @@ export const TopBar: React.FC = () => {
               <div className="px-4 py-2 text-[11px] text-slate-500 border-b border-slate-100">
                 <span className="font-semibold text-slate-700">Batch: </span>
                 {activeBatch?.name || 'All Batches'}
+              </div>
+
+              <div className="py-1 border-b border-slate-100">
+                <button
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    setCurrentView('brochure');
+                  }}
+                  className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center space-x-2 transition-colors"
+                >
+                  <FileText className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Public Brochure & Pricing</span>
+                </button>
               </div>
 
               <button

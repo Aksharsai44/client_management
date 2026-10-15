@@ -56,6 +56,12 @@ export const ClientGroupTab: React.FC<ClientGroupTabProps> = ({
               </button>
             </div>
           ))}
+
+          {batchUsers.length === 0 && (
+            <div className="col-span-full p-8 text-center text-slate-400 text-xs bg-slate-50 rounded-xl">
+              No participants added to this group yet.
+            </div>
+          )}
         </div>
       </div>
     </div>

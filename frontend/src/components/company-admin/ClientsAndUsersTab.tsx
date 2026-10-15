@@ -409,7 +409,15 @@ export const ClientsAndUsersTab: React.FC<ClientsAndUsersTabProps> = ({
                       />
                       <div>
                         <span className="font-bold text-slate-900">{u.name}</span>
-                        <span className="text-[11px] text-slate-500 block font-mono">{u.email}</span>
+                        <div className="flex items-center space-x-1.5 mt-0.5 flex-wrap">
+                          <span className="text-[11px] text-slate-500 font-mono">{u.email}</span>
+                          <span
+                            className="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-mono border border-slate-200"
+                            title="User ID (can be used for login)"
+                          >
+                            ID: {u.id}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </td>

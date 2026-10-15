@@ -18,10 +18,20 @@ import {
   Check,
   Sparkles,
   Zap,
+  Globe,
 } from 'lucide-react';
+import { UNIVERSAL_CURRENCIES, formatUniversalPrice } from '../../utils/currency';
 
 export const BrochurePage: React.FC = () => {
-  const { pricingPlans, submitDemoRequest, setCurrentView, quickSwitchRole } = useApp();
+  const {
+    pricingPlans,
+    submitDemoRequest,
+    setCurrentView,
+    quickSwitchRole,
+    integrationSettings,
+    selectedCurrency,
+    setSelectedCurrency,
+  } = useApp();
 
   const [isYearly, setIsYearly] = useState(false);
   const [formData, setFormData] = useState({
@@ -50,7 +60,7 @@ export const BrochurePage: React.FC = () => {
         teamSize: formData.teamSize,
         requirements: formData.requirements,
       },
-      '15550192831' // Target WhatsApp demo number
+      integrationSettings.demoWhatsappNumber || '15550192831'
     );
 
     setWhatsappSuccess(whatsappUrl);
@@ -151,11 +161,12 @@ export const BrochurePage: React.FC = () => {
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               <button
-                onClick={() => quickSwitchRole('product_super_admin')}
+                onClick={() => setCurrentView('login')}
                 className="px-3 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-semibold flex items-center space-x-1.5 transition-colors"
+                title="Product Admin portal requires .env credentials"
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Product Admin</span>
+                <span>Product Admin (Sign In)</span>
               </button>
               <button
                 onClick={() => quickSwitchRole('company_admin')}
@@ -319,10 +330,10 @@ export const BrochurePage: React.FC = () => {
                 </ul>
               </div>
               <button
-                onClick={() => quickSwitchRole('product_super_admin')}
+                onClick={() => setCurrentView('login')}
                 className="mt-6 w-full py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold text-xs rounded-lg transition-colors"
               >
-                Launch Admin &rarr;
+                Sign In as Admin &rarr;
               </button>
             </div>
 
@@ -451,33 +462,59 @@ export const BrochurePage: React.FC = () => {
               Real-time pricing synced directly from the Product Admin control panel.
             </p>
 
-            {/* Toggle Monthly/Yearly */}
-            <div className="mt-6 inline-flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200">
-              <button
-                onClick={() => setIsYearly(false)}
-                className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                  !isYearly ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                Monthly Billing
-              </button>
-              <button
-                onClick={() => setIsYearly(true)}
-                className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center space-x-1 ${
-                  isYearly ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span>Annual Billing</span>
-                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-black">
-                  Save 20%
-                </span>
-              </button>
+            {/* Billing Toggle & Universal Currency Selector */}
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              {/* Toggle Monthly/Yearly */}
+              <div className="inline-flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-2xs">
+                <button
+                  onClick={() => setIsYearly(false)}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                    !isYearly ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Monthly Billing
+                </button>
+                <button
+                  onClick={() => setIsYearly(true)}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center space-x-1 ${
+                    isYearly ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>Annual Billing</span>
+                  <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-black">
+                    Save 20%
+                  </span>
+                </button>
+              </div>
+
+              {/* Universal Currency Selector */}
+              <div className="inline-flex items-center space-x-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <div className="flex items-center space-x-1 px-2 text-xs font-bold text-slate-500">
+                  <Globe className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="hidden sm:inline">Currency:</span>
+                </div>
+                <select
+                  value={selectedCurrency}
+                  onChange={(e) => setSelectedCurrency(e.target.value)}
+                  className="bg-white text-xs font-bold text-slate-800 rounded-lg px-2.5 py-1.5 border-0 shadow-xs focus:ring-2 focus:ring-blue-500 outline-hidden cursor-pointer"
+                  title="Choose billing currency (auto-synced)"
+                >
+                  {UNIVERSAL_CURRENCIES.map((curr) => (
+                    <option key={curr.code} value={curr.code}>
+                      {curr.symbol} {curr.code} ({curr.name})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 items-stretch">
             {pricingPlans.map((plan) => {
-              const price = isYearly ? plan.yearlyPrice : plan.monthlyPrice;
+              const rawPrice = isYearly ? plan.yearlyPrice : plan.monthlyPrice;
+              const formattedPrice = formatUniversalPrice(rawPrice, selectedCurrency, plan.currency || 'INR');
+              const isConverted = selectedCurrency !== (plan.currency || 'INR');
+
               return (
                 <div
                   key={plan.id}
@@ -498,13 +535,20 @@ export const BrochurePage: React.FC = () => {
                     <h3 className="text-xl font-bold text-slate-900">{plan.name}</h3>
                     <p className="text-xs text-slate-500 mt-1 min-h-[32px]">{plan.tagline}</p>
 
-                    <div className="mt-6 flex items-baseline">
-                      <span className="text-4xl font-extrabold text-slate-900 tracking-tight">
-                        ${price}
-                      </span>
-                      <span className="text-xs font-semibold text-slate-500 ml-1.5">
-                        /{isYearly ? 'year' : 'month'}
-                      </span>
+                    <div className="mt-6">
+                      <div className="flex items-baseline">
+                        <span className="text-4xl font-extrabold text-slate-900 tracking-tight">
+                          {formattedPrice.formatted}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-500 ml-1.5">
+                          /{isYearly ? 'year' : 'month'}
+                        </span>
+                      </div>
+                      {isConverted && (
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Synced & converted from {plan.currency || 'INR'}
+                        </p>
+                      )}
                     </div>
 
                     <div className="mt-6 pt-6 border-t border-slate-100 space-y-3">
@@ -549,43 +593,25 @@ export const BrochurePage: React.FC = () => {
                 <Send className="w-6 h-6" />
               </div>
               <h2 className="text-3xl font-black text-slate-900 tracking-tight">
-                Request an Instant WhatsApp Demo
+                Request a Platform Demo
               </h2>
               <p className="mt-2 text-sm text-slate-600">
-                Submit your team information below. We will immediately route your request to our
-                WhatsApp business channel and generate temporary test credentials in the Product Admin!
+                Submit your team information below. Our team will review your requirements and reach out to schedule a live product demonstration.
               </p>
             </div>
 
             {whatsappSuccess ? (
-              <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-2xl text-center space-y-4">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center">
-                  <CheckCircle2 className="w-6 h-6" />
+              <div className="p-8 bg-emerald-50/80 border border-emerald-200 rounded-2xl text-center space-y-4">
+                <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center shadow-xs">
+                  <CheckCircle2 className="w-7 h-7" />
                 </div>
-                <h4 className="font-bold text-emerald-900 text-lg">
-                  Demo Request Dispatched to WhatsApp!
+                <h4 className="font-bold text-emerald-950 text-xl">
+                  Thank You for Submitting!
                 </h4>
-                <p className="text-xs text-emerald-700 max-w-md mx-auto">
-                  Your details have been logged in the platform registry. Our enterprise product team
-                  has received your WhatsApp lead and a temporary credential is ready for review in
-                  Product Admin.
+                <p className="text-sm text-emerald-800 max-w-md mx-auto leading-relaxed">
+                  Thank you for submitting your details. Our team will contact you shortly to demonstrate the platform and discuss your requirements.
                 </p>
-                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                  <a
-                    href={whatsappSuccess}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold inline-flex items-center space-x-1.5"
-                  >
-                    <span>Reopen WhatsApp Chat</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </a>
-                  <button
-                    onClick={() => quickSwitchRole('product_super_admin')}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold inline-flex items-center space-x-1.5"
-                  >
-                    <span>Inspect in Product Admin</span>
-                  </button>
+                <div className="pt-2">
                   <button
                     onClick={() => {
                       setWhatsappSuccess(null);
@@ -598,9 +624,9 @@ export const BrochurePage: React.FC = () => {
                         requirements: '',
                       });
                     }}
-                    className="px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-bold"
+                    className="px-6 py-2.5 bg-white border border-slate-300 hover:border-slate-400 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-2xs"
                   >
-                    Submit Another
+                    Submit Another Request
                   </button>
                 </div>
               </div>
@@ -694,10 +720,10 @@ export const BrochurePage: React.FC = () => {
 
                 <button
                   type="submit"
-                  className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md flex items-center justify-center space-x-2 transition-all hover:scale-101"
+                  className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md flex items-center justify-center space-x-2 transition-all hover:scale-101 cursor-pointer"
                 >
                   <Send className="w-4 h-4" />
-                  <span>Submit & Send Directly to WhatsApp</span>
+                  <span>Submit Demo Request</span>
                 </button>
               </form>
             )}

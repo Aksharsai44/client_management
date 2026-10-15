@@ -176,27 +176,33 @@ export const WorkDashboardTab: React.FC<WorkDashboardTabProps> = ({
           </button>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {batchResources.slice(0, 4).map((res) => (
-            <div
-              key={res.id}
-              onClick={() => setActiveTab('resources')}
-              className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-white hover:border-amber-400 hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between"
-            >
-              <div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700">
-                  {res.fileType}
-                </span>
-                <h4 className="font-bold text-slate-900 text-xs mt-2 line-clamp-2">{res.title}</h4>
-                <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{res.description}</p>
+        {batchResources.length === 0 ? (
+          <div className="p-8 text-center text-slate-400 text-xs bg-slate-50 rounded-xl">
+            No deliverables uploaded yet for this batch.
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {batchResources.slice(0, 4).map((res) => (
+              <div
+                key={res.id}
+                onClick={() => setActiveTab('resources')}
+                className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-white hover:border-amber-400 hover:shadow-xs transition-all cursor-pointer flex flex-col justify-between"
+              >
+                <div>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-700">
+                    {res.fileType}
+                  </span>
+                  <h4 className="font-bold text-slate-900 text-xs mt-2 line-clamp-2">{res.title}</h4>
+                  <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{res.description}</p>
+                </div>
+                <div className="mt-3 pt-2 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500">
+                  <span>{res.uploaderName}</span>
+                  <span>{res.uploadedAt.split(' ')[0]}</span>
+                </div>
               </div>
-              <div className="mt-3 pt-2 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500">
-                <span>{res.uploaderName}</span>
-                <span>{res.uploadedAt.split(' ')[0]}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

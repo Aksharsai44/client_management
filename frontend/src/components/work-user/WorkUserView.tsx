@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { User } from '../../types';
+import { User, Batch } from '../../types';
 import { AttendanceReportModal } from '../common/AttendanceReportModal';
 import { WorkUserHeader } from './WorkUserHeader';
 import { WorkDashboardTab } from './WorkDashboardTab';
@@ -36,34 +36,118 @@ export const WorkUserView: React.FC = () => {
     users,
   } = useApp();
 
-  const currentBatch = batches.find((b) => b.id === activeBatchId) || batches[0];
-  const userBatches = batches.filter((b) => currentUser.batchIds?.includes(b.id));
+  // 1. Scoped batches for this worker
+  const scopedBatches = useMemo(() => {
+    const matching = batches.filter((b) => {
+      if (currentUser.batchIds && currentUser.batchIds.includes(b.id)) return true;
+      if (currentUser.companyId && b.companyId === currentUser.companyId) return true;
+      if (
+        currentUser.companyName &&
+        b.name &&
+        b.name.toLowerCase().includes(currentUser.companyName.toLowerCase())
+      ) {
+        return true;
+      }
+      return false;
+    });
 
-  // Batch-filtered datasets
-  const batchMeetings = useMemo(
-    () => meetings.filter((m) => m.batchId === activeBatchId),
-    [meetings, activeBatchId]
-  );
-  const batchUsers = useMemo(
-    () => users.filter((u) => u.batchIds?.includes(activeBatchId)),
-    [users, activeBatchId]
-  );
-  const batchPosts = useMemo(
-    () => communityPosts.filter((p) => p.batchId === activeBatchId),
-    [communityPosts, activeBatchId]
-  );
-  const batchResources = useMemo(
-    () => resources.filter((r) => r.batchId === activeBatchId),
-    [resources, activeBatchId]
-  );
+    if (matching.length > 0) return matching;
 
-  // Dynamic attendance rate
+    const primaryBatchId =
+      currentUser.batchIds?.[0] ||
+      (currentUser.companyId ? `batch_${currentUser.companyId}` : 'batch_primary');
+
+    return [
+      {
+        id: primaryBatchId,
+        name: currentUser.companyName
+          ? `${currentUser.companyName} - Team Workspace`
+          : 'Team Workspace',
+        code: 'BAT-01',
+        companyId: currentUser.companyId || '',
+        description: `Dedicated worker workspace for ${currentUser.companyName || 'your organization'}.`,
+        clientCount: 0,
+        workerCount: 1,
+        startDate: new Date().toISOString().split('T')[0],
+        status: 'active' as const,
+        leadAdminId: currentUser.companyId || currentUser.id,
+      },
+    ];
+  }, [batches, currentUser]);
+
+  const currentBatch = useMemo(() => {
+    return (
+      scopedBatches.find((b) => b.id === activeBatchId) ||
+      scopedBatches[0]
+    );
+  }, [scopedBatches, activeBatchId]);
+
+  useEffect(() => {
+    if (currentBatch && activeBatchId !== currentBatch.id) {
+      setActiveBatchId(currentBatch.id);
+    }
+  }, [currentBatch, activeBatchId, setActiveBatchId]);
+
+  const userBatches = scopedBatches;
+
+  // 2. Real Batch Users: ONLY real users added to this organization/batch manually
+  const batchUsers = useMemo(() => {
+    return users.filter((u) => {
+      if (u.role === 'product_super_admin' || u.role === 'product_admin') return false;
+      const matchesCompany =
+        currentUser.companyId && u.companyId === currentUser.companyId;
+      const matchesCompanyName =
+        currentUser.companyName &&
+        u.companyName &&
+        currentUser.companyName.toLowerCase().trim() === u.companyName.toLowerCase().trim();
+      const matchesBatch =
+        currentBatch.id && u.batchIds?.includes(currentBatch.id);
+      return Boolean(matchesCompany || matchesCompanyName || matchesBatch);
+    });
+  }, [users, currentUser, currentBatch.id]);
+
+  // 3. Real Meetings: ONLY meetings scheduled for this batch or organization
+  const batchMeetings = useMemo(() => {
+    return meetings.filter((m) => {
+      if (m.batchId === currentBatch.id) return true;
+      if (currentUser.companyId && m.companyId === currentUser.companyId) return true;
+      return false;
+    });
+  }, [meetings, currentBatch.id, currentUser.companyId]);
+
+  // 4. Real Community Posts: ONLY posts created for this batch or by company members
+  const batchPosts = useMemo(() => {
+    const allowedUserIds = new Set(batchUsers.map((u) => u.id));
+    allowedUserIds.add(currentUser.id);
+    if (currentUser.companyId) allowedUserIds.add(currentUser.companyId);
+
+    return communityPosts.filter((p) => {
+      if (p.batchId === currentBatch.id) return true;
+      if (allowedUserIds.has(p.authorId)) return true;
+      return false;
+    });
+  }, [communityPosts, currentBatch.id, batchUsers, currentUser]);
+
+  // 5. Real Resources: ONLY resources uploaded for this batch or by company members
+  const batchResources = useMemo(() => {
+    const allowedUserIds = new Set(batchUsers.map((u) => u.id));
+    allowedUserIds.add(currentUser.id);
+    if (currentUser.companyId) allowedUserIds.add(currentUser.companyId);
+
+    return resources.filter((r) => {
+      if (r.batchId === currentBatch.id) return true;
+      if (r.uploaderId && allowedUserIds.has(r.uploaderId)) return true;
+      return false;
+    });
+  }, [resources, currentBatch.id, batchUsers, currentUser]);
+
+  // 6. Real Attendance Records
   const workerRecords = useMemo(
     () =>
       attendanceRecords.filter(
-        (r) => r.userId === currentUser.id && r.batchId === activeBatchId
+        (r) => r.userId === currentUser.id && r.batchId === currentBatch.id
       ),
-    [attendanceRecords, currentUser.id, activeBatchId]
+    [attendanceRecords, currentUser.id, currentBatch.id]
   );
   const workerAttendedCount = workerRecords.filter((r) => r.status === 'present').length;
   const workerAttendanceRate =
@@ -191,7 +275,7 @@ export const WorkUserView: React.FC = () => {
 
       {/* 9. WORK USER PROFILE */}
       {activeTab === 'profile' && (
-        <WorkProfileTab currentUser={currentUser} batches={batches} />
+        <WorkProfileTab currentUser={currentUser} batches={userBatches} />
       )}
 
       {/* UPLOAD MODAL */}
