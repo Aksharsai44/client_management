@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { User, CommunityPost, CommunityReply, PostAttachment, PostLink } from '../../types';
+import { UserAvatar } from './UserAvatar';
 import {
   Send,
   Edit2,
@@ -210,14 +211,7 @@ const ReplyItem: React.FC<ReplyItemProps> = ({
         {/* Reply Header */}
         <div className="flex items-center justify-between gap-2 mb-1.5">
           <div className="flex items-center space-x-2.5 flex-wrap gap-y-1">
-            <img
-              src={
-                reply.authorAvatar ||
-                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-              }
-              alt={reply.authorName}
-              className="w-6 h-6 rounded-full object-cover border border-slate-300 shadow-2xs"
-            />
+            <UserAvatar name={reply.authorName} size="xs" />
             <span className="font-bold text-slate-900 text-xs">{reply.authorName}</span>
             <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-slate-200/80 text-slate-700 font-bold uppercase tracking-wider">
               {reply.authorRole.replace('_', ' ')}
@@ -884,14 +878,7 @@ export const TeamCommunityFeed: React.FC<TeamCommunityFeedProps> = ({
               {/* Post Header: Author, Role, Date & Time */}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center space-x-3.5">
-                  <img
-                    src={
-                      post.authorAvatar ||
-                      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'
-                    }
-                    alt={post.authorName}
-                    className="w-10 h-10 rounded-full object-cover border border-slate-300 shadow-2xs"
-                  />
+                  <UserAvatar name={post.authorName} size="md" />
                   <div>
                     <div className="flex items-center space-x-2 flex-wrap">
                       <h4 className="font-extrabold text-slate-900 text-sm">{post.authorName}</h4>
@@ -1118,14 +1105,7 @@ export const TeamCommunityFeed: React.FC<TeamCommunityFeedProps> = ({
 
                 {/* Main Top-Level Reply Input for Post */}
                 <div className="flex items-center space-x-2 pt-2">
-                  <img
-                    src={
-                      currentUser.avatar ||
-                      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-                    }
-                    alt={currentUser.name}
-                    className="w-8 h-8 rounded-full object-cover border border-slate-300 shrink-0"
-                  />
+                  <UserAvatar name={currentUser.name} size="sm" />
                   <div className="flex-1 flex gap-2">
                     <input
                       type="text"

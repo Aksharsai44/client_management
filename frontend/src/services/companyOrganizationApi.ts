@@ -49,6 +49,13 @@ export const companyOrganizationApi = {
   },
 
   /**
+   * Alias for update
+   */
+  async updateCompany(id: string, partial: Partial<CompanyAdminMetric>): Promise<CompanyAdminMetric> {
+    return this.update(id, partial);
+  },
+
+  /**
    * Delete a company organization from database
    */
   async delete(id: string): Promise<void> {

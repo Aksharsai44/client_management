@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { User, AttendanceRecord, Meeting } from '../../types';
+import { UserAvatar } from './UserAvatar';
 import {
   X,
   Printer,
@@ -137,14 +138,7 @@ Generated on: ${new Date().toISOString()}
           {/* User Profile Card */}
           <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs">
             <div className="flex items-center space-x-3">
-              <img
-                src={
-                  user.avatar ||
-                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-                }
-                alt={user.name}
-                className="w-12 h-12 rounded-full object-cover border border-slate-300"
-              />
+              <UserAvatar name={user.name} size="lg" />
               <div>
                 <h4 className="font-bold text-slate-900 text-base">{user.name}</h4>
                 <p className="text-xs text-slate-500">{user.email}</p>

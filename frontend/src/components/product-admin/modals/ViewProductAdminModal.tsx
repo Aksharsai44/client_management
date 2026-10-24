@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, CompanyAdminMetric } from '../../../types';
+import { UserAvatar } from '../../common/UserAvatar';
 import {
   ShieldCheck,
   Shield,
@@ -90,17 +91,7 @@ export const ViewProductAdminModal: React.FC<ViewProductAdminModalProps> = ({
         {/* Profile Card */}
         <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between gap-3">
           <div className="flex items-center space-x-3">
-            {admin.avatar ? (
-              <img
-                src={admin.avatar}
-                alt={admin.name}
-                className="w-12 h-12 rounded-full object-cover border border-slate-200 shadow-2xs"
-              />
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-base uppercase shadow-2xs">
-                {admin.name.charAt(0)}
-              </div>
-            )}
+            <UserAvatar name={admin.name} size="lg" />
             <div>
               <h4 className="font-bold text-slate-900 text-sm">{admin.name}</h4>
               <p className="text-xs text-slate-500 flex items-center space-x-1 mt-0.5">

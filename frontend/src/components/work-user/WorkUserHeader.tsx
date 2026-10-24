@@ -33,7 +33,7 @@ export const WorkUserHeader: React.FC<WorkUserHeaderProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Work Workspace &bull; {currentUser.designation || 'Engineer & Contributor'}
+            Work Workspace &bull; {currentUser.designation || 'Team Member'}
           </p>
         </div>
       </div>

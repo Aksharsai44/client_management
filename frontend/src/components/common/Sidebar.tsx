@@ -17,6 +17,7 @@ import {
   Building2,
   FolderLock,
   Layers,
+  CreditCard,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -28,6 +29,7 @@ export const Sidebar: React.FC = () => {
     demoRequests,
     companyAdminMetrics,
     pricingPlans,
+    payments,
   } = useApp();
 
   interface NavItem {
@@ -37,6 +39,21 @@ export const Sidebar: React.FC = () => {
     badge?: string | number;
     hidden?: boolean;
   }
+
+  // Count pending / overdue payments for badges
+  const adminPendingCount = payments.filter(
+    (p) =>
+      p.status !== 'paid' &&
+      (!currentUser?.companyId || p.companyId === currentUser.companyId)
+  ).length;
+
+  const clientPendingCount = payments.filter(
+    (p) =>
+      p.status !== 'paid' &&
+      (p.clientEmail?.toLowerCase() === currentUser?.email?.toLowerCase() ||
+        p.clientName?.toLowerCase() === currentUser?.name?.toLowerCase() ||
+        (currentUser?.companyId && p.companyId === currentUser.companyId))
+  ).length;
 
   const getNavItems = (): NavItem[] => {
     switch (currentUser.role) {
@@ -91,6 +108,12 @@ export const Sidebar: React.FC = () => {
         return [
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { id: 'clients_users', label: 'Clients & Users', icon: Users },
+          {
+            id: 'payments',
+            label: 'Payments Tracking',
+            icon: CreditCard,
+            badge: adminPendingCount > 0 ? adminPendingCount : undefined,
+          },
           { id: 'community', label: 'Team Community', icon: MessagesSquare },
           {
             id: 'chat',
@@ -110,6 +133,12 @@ export const Sidebar: React.FC = () => {
         return [
           { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
           { id: 'client_group', label: 'Client Group & Batch', icon: Building2 },
+          {
+            id: 'payments',
+            label: 'Payments & Invoices',
+            icon: CreditCard,
+            badge: clientPendingCount > 0 ? `${clientPendingCount} Due` : undefined,
+          },
           { id: 'community', label: 'Team Community', icon: MessagesSquare },
           {
             id: 'chat',

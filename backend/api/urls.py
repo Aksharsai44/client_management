@@ -26,4 +26,41 @@ urlpatterns = [
     path('users/', views.workspace_users_list_create, name='workspace_users_list_create'),
     path('users/seed/', views.seed_initial_workspace_users, name='seed_initial_workspace_users'),
     path('users/<str:pk>/', views.workspace_user_detail, name='workspace_user_detail'),
+    # Project MOUs & Agreements
+    path('project-mous/', views.project_mous_list_create, name='project_mous_list_create'),
+    path('project-mous/<str:pk>/', views.project_mou_detail, name='project_mou_detail'),
+    # Payments & Monthly Billing
+    path('payments/', views.payments_list_create, name='payments_list_create'),
+    path('payments/seed/', views.seed_initial_payments, name='seed_initial_payments'),
+    path('payments/<str:pk>/', views.payment_detail, name='payment_detail'),
+    path('payments/<str:pk>/mark-paid/', views.payment_mark_paid, name='payment_mark_paid'),
+    path('payments/<str:pk>/send-reminder/', views.payment_send_reminder, name='payment_send_reminder'),
+    # Team Community Forum Endpoints
+    path('community-posts/', views.community_posts_list_create, name='community_posts_list_create'),
+    path('community-posts/seed/', views.seed_initial_community_posts, name='seed_initial_community_posts'),
+    path('community-posts/<str:pk>/', views.community_post_detail, name='community_post_detail'),
+    path('community-posts/<str:pk>/like/', views.community_post_toggle_like, name='community_post_toggle_like'),
+    path('community-posts/<str:pk>/replies/', views.community_post_add_reply, name='community_post_add_reply'),
+    path('community-posts/<str:pk>/replies/<str:reply_pk>/', views.community_post_delete_reply, name='community_post_delete_reply'),
+    path('community-posts/<str:pk>/replies/<str:reply_pk>/like/', views.community_post_toggle_like_reply, name='community_post_toggle_like_reply'),
+    # Chat Messages & WhatsApp-style real-time endpoints
+    path('chat-messages/', views.chat_messages_list_create, name='chat_messages_list_create'),
+    path('chat-messages/seed/', views.seed_initial_chat_messages, name='seed_initial_chat_messages'),
+    path('chat-messages/mark-read/', views.chat_messages_mark_read, name='chat_messages_mark_read'),
+    path('chat-messages/upload/', views.chat_upload_attachment, name='chat_upload_attachment'),
+    path('chat-messages/<str:pk>/delete-for-me/', views.chat_message_delete_for_me, name='chat_message_delete_for_me'),
+    path('chat-messages/<str:pk>/', views.chat_message_detail, name='chat_message_detail'),
+    # Deliverable Resources & File / Link Endpoints
+    path('resources/', views.deliverable_resources_list_create, name='deliverable_resources_list_create'),
+    path('resources/upload/', views.deliverable_resource_upload_file, name='deliverable_resource_upload_file'),
+    path('resources/seed/', views.seed_initial_deliverable_resources, name='seed_initial_deliverable_resources'),
+    path('resources/<str:pk>/', views.deliverable_resource_detail, name='deliverable_resource_detail'),
+    path('resources/<str:pk>/review/', views.deliverable_resource_review, name='deliverable_resource_review'),
+    # System Integration & Company Settings Endpoints
+    path('settings/integrations/', views.system_integration_settings_view, name='system_integration_settings_view'),
+    path('settings/company/', views.company_settings_view, name='company_settings_view'),
+    # Workspace Batches & Cohorts Endpoints
+    path('batches/', views.batches_list_create, name='batches_list_create'),
+    path('batches/seed/', views.seed_initial_batches, name='seed_initial_batches'),
+    path('batches/<str:pk>/', views.batch_detail, name='batch_detail'),
 ]

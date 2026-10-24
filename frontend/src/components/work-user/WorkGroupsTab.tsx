@@ -1,6 +1,7 @@
 import React from 'react';
 import { User, Batch } from '../../types';
 import { Eye } from 'lucide-react';
+import { UserAvatar } from '../common/UserAvatar';
 
 interface WorkGroupsTabProps {
   currentBatch: Batch;
@@ -30,14 +31,7 @@ export const WorkGroupsTab: React.FC<WorkGroupsTabProps> = ({
               className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex items-center justify-between"
             >
               <div className="flex items-center space-x-3">
-                <img
-                  src={
-                    member.avatar ||
-                    'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80'
-                  }
-                  alt={member.name}
-                  className="w-10 h-10 rounded-full object-cover border border-slate-300"
-                />
+                <UserAvatar name={member.name} size="md" />
                 <div>
                   <h4 className="font-bold text-slate-900 text-xs">{member.name}</h4>
                   <span className="text-[10px] text-slate-500 block">{member.email}</span>

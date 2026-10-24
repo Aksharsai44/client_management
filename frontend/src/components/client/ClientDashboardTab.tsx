@@ -1,6 +1,21 @@
-import React from 'react';
-import { Meeting, ResourceItem, CommunityPost, AttendanceRecord, User } from '../../types';
-import { Video } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Meeting, ResourceItem, CommunityPost, AttendanceRecord, User, PaymentRecord } from '../../types';
+import { useApp } from '../../context/AppContext';
+import {
+  Video,
+  CreditCard,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  QrCode,
+  Landmark,
+  ShieldCheck,
+  ArrowRight,
+  Sparkles,
+  Receipt,
+  ExternalLink,
+} from 'lucide-react';
+import { ClientPaymentGatewayModal } from './modals/ClientPaymentGatewayModal';
 
 interface ClientDashboardTabProps {
   batchMeetings: Meeting[];
@@ -23,11 +38,180 @@ export const ClientDashboardTab: React.FC<ClientDashboardTabProps> = ({
   currentUser,
   setActiveTab,
 }) => {
+  const { payments, companyAdminMetrics, markPaymentPaid } = useApp();
+
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  const today = new Date();
+  const currentMonthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonthName = today.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  // 1. Scoped payments for this client
+  const clientPayments = useMemo(() => {
+    return payments.filter((p) => {
+      if (currentUser?.email && p.clientEmail?.toLowerCase() === currentUser.email.toLowerCase()) return true;
+      if (currentUser?.name && p.clientName?.toLowerCase() === currentUser.name.toLowerCase()) return true;
+      if (currentUser?.companyName && p.clientName?.toLowerCase().includes(currentUser.companyName.toLowerCase())) return true;
+      if (currentUser?.companyId && p.companyId === currentUser.companyId) return true;
+      return false;
+    });
+  }, [payments, currentUser]);
+
+  // Priority: 1st unpaid payment, or current month payment, or most recent
+  const activePayment = useMemo(() => {
+    const pending = clientPayments.find((p) => p.status !== 'paid');
+    if (pending) return pending;
+    const thisMonth = clientPayments.find((p) => p.billingMonth === currentMonthKey);
+    if (thisMonth) return thisMonth;
+    return clientPayments[0] || null;
+  }, [clientPayments, currentMonthKey]);
+
+  // Resolve receiving company organization details (admin's receiving bank & UPI)
+  const receivingCompany = useMemo(() => {
+    const targetCompanyId = activePayment?.companyId || currentUser?.companyId;
+    if (targetCompanyId) {
+      const matched = companyAdminMetrics.find(
+        (c) => c.companyAdminId === targetCompanyId || c.id === targetCompanyId
+      );
+      if (matched) return matched;
+    }
+    return companyAdminMetrics[0] || null;
+  }, [companyAdminMetrics, activePayment, currentUser]);
+
   const upcomingMeetings = batchMeetings.filter((m) => m.status === 'upcoming');
   const nextMeeting = upcomingMeetings[0];
 
   return (
     <div className="space-y-6">
+      {/* Toast Notification */}
+      {successToast && (
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{successToast}</span>
+          </div>
+          <button onClick={() => setSuccessToast(null)} className="text-emerald-600 hover:text-emerald-800 cursor-pointer">
+            &times;
+          </button>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* PAYMENT OBLIGATION & 1-CLICK CHECKOUT HERO BANNER                          */}
+      {/* ========================================================================= */}
+      {activePayment && (
+        <div
+          className={`border rounded-2xl p-6 shadow-xs relative overflow-hidden transition-all ${
+            activePayment.status === 'paid'
+              ? 'bg-gradient-to-r from-emerald-50 via-teal-50/50 to-white border-emerald-200'
+              : activePayment.status === 'overdue'
+              ? 'bg-gradient-to-r from-rose-50 via-red-50/40 to-white border-rose-300'
+              : 'bg-gradient-to-r from-amber-50/80 via-blue-50/30 to-white border-amber-300'
+          }`}
+        >
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="space-y-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                    activePayment.status === 'paid'
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : activePayment.status === 'overdue'
+                      ? 'bg-rose-100 text-rose-800 border-rose-300'
+                      : 'bg-amber-100 text-amber-800 border-amber-300'
+                  }`}
+                >
+                  {activePayment.status === 'paid'
+                    ? 'Payment Settled & Verified'
+                    : activePayment.status === 'overdue'
+                    ? 'Payment Overdue • Action Required'
+                    : 'Payment Due • Action Required'}
+                </span>
+
+                <span className="text-xs text-slate-500 font-mono">
+                  Invoice #{activePayment.invoiceNumber}
+                </span>
+
+                <span className="text-xs text-slate-400 font-medium">
+                  &bull; Billing Cycle: {activePayment.billingMonth || currentMonthName}
+                </span>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                  {activePayment.status === 'paid' ? (
+                    <>
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                      <span>{currentMonthName} Payment Complete</span>
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="w-5 h-5 text-amber-600 shrink-0" />
+                      <span>Outstanding Invoice: {activePayment.currencySymbol}{activePayment.amount.toLocaleString()}</span>
+                    </>
+                  )}
+                </h3>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  {activePayment.status === 'paid'
+                    ? `Settled on ${activePayment.paidDate} via ${activePayment.paymentMethod || 'Online Payment'} (Ref: ${activePayment.transactionReference}). All services active.`
+                    : `Project retainer fee of ${activePayment.currencySymbol}${activePayment.amount.toLocaleString()} is due on ${activePayment.dueDate}. You can complete payment instantly via UPI, Card, NetBanking, or Bank Transfer.`}
+                </p>
+              </div>
+
+              {/* Supported payment methods badges */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <div className="inline-flex items-center space-x-1 text-[11px] font-bold text-slate-600 bg-white/90 border border-slate-200 px-2.5 py-1 rounded-lg shadow-2xs">
+                  <QrCode className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Instant UPI QR</span>
+                </div>
+                <div className="inline-flex items-center space-x-1 text-[11px] font-bold text-slate-600 bg-white/90 border border-slate-200 px-2.5 py-1 rounded-lg shadow-2xs">
+                  <CreditCard className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Cards (Visa/MC)</span>
+                </div>
+                <div className="inline-flex items-center space-x-1 text-[11px] font-bold text-slate-600 bg-white/90 border border-slate-200 px-2.5 py-1 rounded-lg shadow-2xs">
+                  <Landmark className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>NetBanking</span>
+                </div>
+                {receivingCompany?.bankName && (
+                  <span className="text-[10px] text-slate-500 font-medium hidden sm:inline">
+                    &bull; Payout routes to {receivingCompany.companyName} ({receivingCompany.bankName})
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Action Buttons */}
+            <div className="shrink-0 flex flex-wrap items-center gap-3">
+              {activePayment.status !== 'paid' ? (
+                <button
+                  onClick={() => setPaymentModalOpen(true)}
+                  className="px-6 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-98 text-white rounded-xl text-xs font-black shadow-md hover:shadow-lg transition-all flex items-center space-x-2 cursor-pointer"
+                >
+                  <CreditCard className="w-4 h-4 text-blue-200" />
+                  <span>Pay {activePayment.currencySymbol}{activePayment.amount.toLocaleString()} Now</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <div className="px-4 py-2.5 bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-xl text-xs font-bold flex items-center space-x-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>No Dues Pending</span>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('payments')}
+                    className="px-3.5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-colors cursor-pointer flex items-center space-x-1"
+                  >
+                    <Receipt className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Billing History</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Key Analytics & Attendance Progress */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
@@ -69,7 +253,7 @@ export const ClientDashboardTab: React.FC<ClientDashboardTabProps> = ({
             </div>
             <button
               onClick={() => setActiveTab('meetings')}
-              className="text-xs font-semibold text-emerald-700 hover:underline"
+              className="text-xs font-semibold text-emerald-700 hover:underline cursor-pointer"
             >
               View All Meetings &rarr;
             </button>
@@ -115,7 +299,7 @@ export const ClientDashboardTab: React.FC<ClientDashboardTabProps> = ({
             <h4 className="font-bold text-slate-900 text-xs">Calendar & Attendance</h4>
             <button
               onClick={() => setActiveTab('calendar')}
-              className="text-[11px] text-emerald-700 font-semibold"
+              className="text-[11px] text-emerald-700 font-semibold cursor-pointer"
             >
               View Attendance
             </button>
@@ -170,7 +354,7 @@ export const ClientDashboardTab: React.FC<ClientDashboardTabProps> = ({
           </div>
           <button
             onClick={() => setActiveTab('resources')}
-            className="text-xs font-bold text-emerald-700 hover:text-emerald-900"
+            className="text-xs font-bold text-emerald-700 hover:text-emerald-900 cursor-pointer"
           >
             View & Rate All Resources &rarr;
           </button>
@@ -204,6 +388,24 @@ export const ClientDashboardTab: React.FC<ClientDashboardTabProps> = ({
           </div>
         )}
       </div>
+
+      {/* ========================================================================= */}
+      {/* CLIENT PAYMENT GATEWAY MODAL (UPI, Card, NetBanking, Direct Transfer)     */}
+      {/* ========================================================================= */}
+      {paymentModalOpen && activePayment && (
+        <ClientPaymentGatewayModal
+          isOpen={paymentModalOpen}
+          onClose={() => setPaymentModalOpen(false)}
+          payment={activePayment}
+          receivingCompany={receivingCompany}
+          onPaymentComplete={(paymentId, details) => {
+            markPaymentPaid(paymentId, details);
+            setSuccessToast(
+              `Payment of ${activePayment.currencySymbol}${activePayment.amount.toLocaleString()} completed and verified! Status updated to PAID across both Client & Company Admin portals.`
+            );
+          }}
+        />
+      )}
     </div>
   );
 };

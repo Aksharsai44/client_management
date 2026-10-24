@@ -90,19 +90,26 @@ export const WorkUserView: React.FC = () => {
 
   const userBatches = scopedBatches;
 
-  // 2. Real Batch Users: ONLY real users added to this organization/batch manually
+  // 2. Real Batch Users: ONLY real users added to this specific batch
   const batchUsers = useMemo(() => {
     return users.filter((u) => {
       if (u.role === 'product_super_admin' || u.role === 'product_admin') return false;
       const matchesCompany =
-        currentUser.companyId && u.companyId === currentUser.companyId;
+        !currentUser.companyId || u.companyId === currentUser.companyId;
       const matchesCompanyName =
-        currentUser.companyName &&
-        u.companyName &&
+        !currentUser.companyName ||
+        !u.companyName ||
         currentUser.companyName.toLowerCase().trim() === u.companyName.toLowerCase().trim();
-      const matchesBatch =
-        currentBatch.id && u.batchIds?.includes(currentBatch.id);
-      return Boolean(matchesCompany || matchesCompanyName || matchesBatch);
+      if (!matchesCompany && !matchesCompanyName) return false;
+
+      // Always include company admin so team members can communicate with their admin
+      if (u.role === 'company_admin') return true;
+
+      const matchesBatch = Boolean(
+        (u.batchIds && u.batchIds.includes(currentBatch.id)) ||
+        (u as any).batchId === currentBatch.id
+      );
+      return matchesBatch;
     });
   }, [users, currentUser, currentBatch.id]);
 
@@ -282,8 +289,8 @@ export const WorkUserView: React.FC = () => {
       <WorkResourceUploadModal
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
-        onUpload={(title, desc, fileType, fileSize) =>
-          addResource(title, desc, fileType, fileSize)
+        onUpload={(title, desc, fileType, fileSize, fileUrl, fileName, externalLink) =>
+          addResource(title, desc, fileType, fileSize, fileUrl, fileName, externalLink)
         }
       />
 

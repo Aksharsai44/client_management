@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building } from 'lucide-react';
+import { Building, Plus } from 'lucide-react';
 import { Batch } from '../../types';
 
 interface CompanyAdminHeaderProps {
@@ -7,6 +7,7 @@ interface CompanyAdminHeaderProps {
   batches: Batch[];
   activeBatchId: string;
   setActiveBatchId: (id: string) => void;
+  onOpenAddBatch?: () => void;
 }
 
 export const CompanyAdminHeader: React.FC<CompanyAdminHeaderProps> = ({
@@ -14,6 +15,7 @@ export const CompanyAdminHeader: React.FC<CompanyAdminHeaderProps> = ({
   batches,
   activeBatchId,
   setActiveBatchId,
+  onOpenAddBatch,
 }) => {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -36,28 +38,42 @@ export const CompanyAdminHeader: React.FC<CompanyAdminHeaderProps> = ({
         </div>
       </div>
 
-      {/* Batch Switcher dropdown in header */}
-      {batches && batches.length > 0 ? (
-        <div className="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
-          <span className="text-xs font-semibold text-slate-600 pl-2">Cohort / Batch:</span>
-          <select
-            value={activeBatchId}
-            onChange={(e) => setActiveBatchId(e.target.value)}
-            className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs font-bold text-slate-800 focus:outline-none"
+      {/* Batch Switcher dropdown and + New Batch action */}
+      <div className="flex items-center space-x-2">
+        {batches && batches.length > 0 ? (
+          <div className="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+            <span className="text-xs font-semibold text-slate-600 pl-2">Cohort / Batch:</span>
+            <select
+              value={activeBatchId}
+              onChange={(e) => setActiveBatchId(e.target.value)}
+              className="px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+            >
+              {batches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name} ({b.code})
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="flex items-center space-x-2 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 text-amber-800 text-xs font-semibold">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            <span>Fresh Tenant Workspace &bull; 0 Batches Active</span>
+          </div>
+        )}
+
+        {onOpenAddBatch && (
+          <button
+            type="button"
+            onClick={onOpenAddBatch}
+            className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center space-x-1.5 shadow-2xs shrink-0"
+            title="Create a new workspace cohort"
           >
-            {batches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : (
-        <div className="flex items-center space-x-2 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 text-amber-800 text-xs font-semibold">
-          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-          <span>Fresh Tenant Workspace &bull; 0 Batches Active</span>
-        </div>
-      )}
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">New Batch</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 };

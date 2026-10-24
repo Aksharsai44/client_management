@@ -144,6 +144,11 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Media and attachment storage
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+CHAT_ATTACHMENTS_ROOT = os.path.join(BASE_DIR, 'chat_attachments')
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 

@@ -5,6 +5,7 @@ import { AttendanceReportModal } from '../common/AttendanceReportModal';
 import { ClientHeader } from './ClientHeader';
 import { ClientDashboardTab } from './ClientDashboardTab';
 import { ClientGroupTab } from './ClientGroupTab';
+import { ClientPaymentsTab } from './ClientPaymentsTab';
 import { ClientCommunityTab } from './ClientCommunityTab';
 import { ClientChatTab } from './ClientChatTab';
 import { ClientMeetingsTab } from './ClientMeetingsTab';
@@ -37,6 +38,7 @@ export const ClientView: React.FC = () => {
     currentUser,
     users,
     companySettings,
+    companyAdminMetrics,
   } = useApp();
 
   // 1. Scoped batches for this client organization
@@ -95,30 +97,68 @@ export const ClientView: React.FC = () => {
 
   const userBatches = scopedBatches;
 
-  // 2. Real Batch Users: ONLY real users added to this organization/batch manually
+  // 2. Real Batch Users: ONLY real users added to THIS specific selected batch
   const batchUsers = useMemo(() => {
-    return users.filter((u) => {
+    const list: User[] = users.filter((u) => {
       // Never show platform product admins
       if (u.role === 'product_super_admin' || u.role === 'product_admin') return false;
 
-      // Match by companyId or companyName or batch
-      const matchesCompany =
-        currentUser.companyId && u.companyId === currentUser.companyId;
-      const matchesCompanyName =
-        currentUser.companyName &&
-        u.companyName &&
-        currentUser.companyName.toLowerCase().trim() === u.companyName.toLowerCase().trim();
-      const matchesBatch =
-        currentBatch.id && u.batchIds?.includes(currentBatch.id);
+      // Organization boundary: must belong to same company if currentUser.companyId exists
+      if (currentUser.companyId && u.companyId && u.companyId !== currentUser.companyId) {
+        return false;
+      }
 
-      return Boolean(matchesCompany || matchesCompanyName || matchesBatch);
+      // Always include Company Admin of this organization so client can communicate with their admin!
+      if (u.role === 'company_admin') return true;
+
+      // Strict Batch Matching:
+      // 1. Explicitly has currentBatch.id in their batchIds list
+      if (u.batchIds && u.batchIds.includes(currentBatch.id)) return true;
+
+      // 2. Has single batchId matching currentBatch.id
+      if ((u as any).batchId === currentBatch.id) return true;
+
+      // 3. Lead admin of this batch
+      if (currentBatch.leadAdminId === u.id) return true;
+
+      return false;
     });
-  }, [users, currentUser, currentBatch.id]);
 
-  // 3. Real Meetings: ONLY meetings scheduled for this batch or organization
+    // Also ensure Company Admin from companyAdminMetrics is always present for the client
+    (companyAdminMetrics || []).forEach((org) => {
+      const adminId = org.companyAdminId || (org as any).id;
+      if (
+        !currentUser.companyId ||
+        currentUser.companyId === adminId ||
+        (currentUser.companyName &&
+          org.companyName &&
+          currentUser.companyName.toLowerCase().includes(org.companyName.toLowerCase()))
+      ) {
+        if (!list.some((u) => u.id === adminId)) {
+          list.push({
+            id: adminId,
+            name: org.adminName,
+            email: org.adminEmail,
+            role: 'company_admin',
+            companyId: adminId,
+            companyName: org.companyName,
+            batchIds: [`batch_${adminId}`],
+            status: org.status === 'paused' ? 'inactive' : 'active',
+            phone: org.phone || '',
+            designation: 'Company Administrator',
+            joinedDate: org.createdAt || '2026-01-01',
+          });
+        }
+      }
+    });
+
+    return list;
+  }, [users, currentUser, currentBatch, chatMessages, companyAdminMetrics]);
+
+  // 3. Real Meetings: ONLY meetings scheduled for this batch
   const batchMeetings = useMemo(() => {
     return meetings.filter((m) => {
-      if (m.batchId === currentBatch.id) return true;
+      if (m.batchId) return m.batchId === currentBatch.id;
       if (currentUser.companyId && m.companyId === currentUser.companyId) return true;
       return false;
     });
@@ -214,8 +254,16 @@ export const ClientView: React.FC = () => {
         <ClientGroupTab
           currentBatch={currentBatch}
           batchUsers={batchUsers}
+          userBatches={userBatches}
+          activeBatchId={activeBatchId}
+          setActiveBatchId={setActiveBatchId}
           onViewReport={(member) => setReportUser(member)}
         />
+      )}
+
+      {/* CLIENT PAYMENTS & INVOICES TAB */}
+      {activeTab === 'payments' && (
+        <ClientPaymentsTab />
       )}
 
       {/* 3. TEAM COMMUNITY TAB */}
@@ -293,8 +341,8 @@ export const ClientView: React.FC = () => {
       <ClientResourceUploadModal
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
-        onUpload={(title, desc, fileType, fileSize) =>
-          addResource(title, desc, fileType, fileSize)
+        onUpload={(title, desc, fileType, fileSize, fileUrl, fileName, externalLink) =>
+          addResource(title, desc, fileType, fileSize, fileUrl, fileName, externalLink)
         }
       />
 

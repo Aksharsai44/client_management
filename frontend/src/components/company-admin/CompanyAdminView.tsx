@@ -6,6 +6,7 @@ import { AttendanceReportModal } from '../common/AttendanceReportModal';
 import { CompanyAdminHeader } from './CompanyAdminHeader';
 import { CompanyDashboardTab } from './CompanyDashboardTab';
 import { ClientsAndUsersTab } from './ClientsAndUsersTab';
+import { CompanyPaymentsTab } from './CompanyPaymentsTab';
 import { CompanyCommunityTab } from './CompanyCommunityTab';
 import { CompanyChatTab } from './CompanyChatTab';
 import { CompanySchedulingTab } from './CompanySchedulingTab';
@@ -21,6 +22,7 @@ import { ViewUserDetailsModal } from './modals/ViewUserDetailsModal';
 import { EditUserModal } from './modals/EditUserModal';
 import { ScheduleMeetingModal } from './modals/ScheduleMeetingModal';
 import { CompanyResourceModal } from './modals/CompanyResourceModal';
+import { AddBatchModal } from './modals/AddBatchModal';
 
 export const CompanyAdminView: React.FC = () => {
   const {
@@ -62,6 +64,9 @@ export const CompanyAdminView: React.FC = () => {
       return batches;
     }
     const filtered = batches.filter((b) => {
+      if (currentUser.batchIds && Array.isArray(currentUser.batchIds) && currentUser.batchIds.includes(b.id)) {
+        return true;
+      }
       if (currentUser.companyId && b.companyId === currentUser.companyId) return true;
       if (b.leadAdminId === currentUser.id) return true;
       if (
@@ -119,69 +124,87 @@ export const CompanyAdminView: React.FC = () => {
     }
   }, [scopedBatches, activeBatchId, setActiveBatchId]);
 
-  // Scoped batch data: strictly isolate to activeBatchId when it belongs to scoped batches
-  const isBatchActiveInScope = Boolean(activeBatchId && scopedBatches.some((b) => b.id === activeBatchId));
+  // Scoped batch data: strictly isolate to currentBatch.id (or activeBatchId)
+  const targetBatchId = activeBatchId || currentBatch.id;
 
-  const batchMeetings = useMemo(
-    () =>
-      isBatchActiveInScope
-        ? meetings.filter(
-            (m) =>
-              m.batchId === activeBatchId ||
-              (currentUser?.companyId && m.companyId === currentUser.companyId)
-          )
-        : [],
-    [meetings, activeBatchId, isBatchActiveInScope, currentUser]
-  );
-  const batchUsers = useMemo(() => {
-    if (isBatchActiveInScope) {
-      return users.filter(
-        (u) =>
-          u.batchIds?.includes(activeBatchId) ||
-          (currentUser?.companyId && u.companyId === currentUser.companyId && u.role !== 'company_admin')
-      );
-    }
-    if (currentUser?.companyId) {
-      return users.filter((u) => u.companyId === currentUser.companyId && u.role !== 'company_admin');
-    }
-    return [];
-  }, [users, activeBatchId, isBatchActiveInScope, currentUser]);
+  const batchMeetings = useMemo(() => {
+    const orgMeetings = currentUser?.companyId
+      ? meetings.filter((m) => !m.companyId || m.companyId === currentUser.companyId)
+      : meetings;
+    return orgMeetings.filter((m) => m.batchId === targetBatchId);
+  }, [meetings, targetBatchId, currentUser]);
 
   const batchCompanies = useMemo(() => {
-    if (isBatchActiveInScope) {
-      return clientCompanies.filter(
-        (c) =>
-          c.batchId === activeBatchId ||
-          (currentUser?.companyId && c.companyId === currentUser.companyId)
-      );
-    }
-    if (currentUser?.companyId) {
-      return clientCompanies.filter((c) => c.companyId === currentUser.companyId);
-    }
-    return [];
-  }, [clientCompanies, activeBatchId, isBatchActiveInScope, currentUser]);
-  const batchPosts = useMemo(
-    () =>
-      isBatchActiveInScope
-        ? communityPosts.filter(
-            (p) =>
-              p.batchId === activeBatchId ||
-              (currentUser?.companyId && p.companyId === currentUser.companyId)
-          )
-        : [],
-    [communityPosts, activeBatchId, isBatchActiveInScope, currentUser]
-  );
-  const batchResources = useMemo(
-    () =>
-      isBatchActiveInScope
-        ? resources.filter(
-            (r) =>
-              r.batchId === activeBatchId ||
-              (currentUser?.companyId && r.companyId === currentUser.companyId)
-          )
-        : [],
-    [resources, activeBatchId, isBatchActiveInScope, currentUser]
-  );
+    const orgCompanies = currentUser?.companyId
+      ? clientCompanies.filter((c) => c.companyId === currentUser.companyId)
+      : clientCompanies;
+
+    return orgCompanies.filter((c) => {
+      if (c.batchId) {
+        return c.batchId === targetBatchId;
+      }
+      return (scopedBatches[0]?.id || '') === targetBatchId;
+    });
+  }, [clientCompanies, targetBatchId, currentUser, scopedBatches]);
+
+  const batchUsers = useMemo(() => {
+    const currentBatchId = targetBatchId;
+    const batchCompanyNames = new Set(
+      batchCompanies.map((c) => c.name.toLowerCase().trim())
+    );
+
+    return users.filter((u) => {
+      // Exclude platform product admins and the current user
+      if (u.role === 'product_super_admin' || u.role === 'product_admin') return false;
+      if (u.id === currentUser?.id) return false;
+
+      // Organization boundary check
+      if (currentUser?.companyId && u.companyId && u.companyId !== currentUser.companyId) {
+        return false;
+      }
+      if (
+        currentUser?.companyName &&
+        u.companyName &&
+        !u.companyId &&
+        u.companyName.toLowerCase().trim() !== currentUser.companyName.toLowerCase().trim() &&
+        !batchCompanyNames.has(u.companyName.toLowerCase().trim())
+      ) {
+        return false;
+      }
+
+      // Check batch membership strictly:
+      // 1. Explicitly has targetBatchId in batchIds
+      if (u.batchIds && Array.isArray(u.batchIds) && u.batchIds.includes(currentBatchId)) {
+        return true;
+      }
+
+      // 2. Direct batchId property
+      if ((u as any).batchId === currentBatchId) {
+        return true;
+      }
+
+      // 3. User's client company is in this batch
+      if (u.companyName && batchCompanyNames.has(u.companyName.toLowerCase().trim())) {
+        return true;
+      }
+
+      return false;
+    });
+  }, [users, targetBatchId, currentUser, batchCompanies]);
+
+  const batchPosts = useMemo(() => {
+    const orgPosts = currentUser?.companyId
+      ? communityPosts.filter((p) => !p.companyId || p.companyId === currentUser.companyId)
+      : communityPosts;
+    return orgPosts.filter((p) => p.batchId === targetBatchId);
+  }, [communityPosts, targetBatchId, currentUser]);
+
+  const batchResources = useMemo(() => {
+    const orgResources = currentUser?.companyId
+      ? resources.filter((r) => !r.companyId || r.companyId === currentUser.companyId)
+      : resources;
+    return orgResources.filter((r) => r.batchId === targetBatchId);
+  }, [resources, targetBatchId, currentUser]);
 
   // Attendance report modal user
   const [reportUser, setReportUser] = useState<User | null>(null);
@@ -194,6 +217,7 @@ export const CompanyAdminView: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isScheduleModal, setIsScheduleModal] = useState(false);
   const [isUploadResourceModal, setIsUploadResourceModal] = useState(false);
+  const [isAddBatchModal, setIsAddBatchModal] = useState(false);
   const [csvUploadSuccess, setCsvUploadSuccess] = useState<string | null>(null);
 
   // Selected meeting for AI transcripts
@@ -321,13 +345,14 @@ export const CompanyAdminView: React.FC = () => {
         </div>
       )}
 
-      {/* Batch Header Bar - Only visible on Dashboard tab */}
-      {activeTab === 'dashboard' && (
+      {/* Batch Header Bar - Visible across batch-scoped tabs */}
+      {['dashboard', 'clients_users', 'community', 'scheduling', 'ai_transcripts', 'calendar', 'resources', 'payments'].includes(activeTab) && (
         <CompanyAdminHeader
           currentBatch={currentBatch}
           batches={scopedBatches}
           activeBatchId={activeBatchId}
           setActiveBatchId={setActiveBatchId}
+          onOpenAddBatch={() => setIsAddBatchModal(true)}
         />
       )}
 
@@ -368,6 +393,17 @@ export const CompanyAdminView: React.FC = () => {
               status: company.status === 'active' ? 'paused' : 'active',
             })
           }
+        />
+      )}
+
+      {/* PAYMENTS & PROJECT MOUS TAB */}
+      {activeTab === 'payments' && (
+        <CompanyPaymentsTab
+          batchCompanies={batchCompanies}
+          currentBatch={currentBatch}
+          scopedBatches={scopedBatches}
+          activeBatchId={activeBatchId}
+          setActiveBatchId={setActiveBatchId}
         />
       )}
 
@@ -455,7 +491,7 @@ export const CompanyAdminView: React.FC = () => {
 
       {/* 10. PROFILE TAB */}
       {activeTab === 'profile' && (
-        <CompanyProfileTab currentUser={currentUser} batches={batches} />
+        <CompanyProfileTab currentUser={currentUser} batches={scopedBatches} />
       )}
 
       {/* ================= MODALS ================= */}
@@ -498,6 +534,13 @@ export const CompanyAdminView: React.FC = () => {
         onUpdate={(u) => updateUser(u)}
       />
 
+      <AddBatchModal
+        isOpen={isAddBatchModal}
+        onClose={() => setIsAddBatchModal(false)}
+        currentUser={currentUser}
+        onBatchCreated={(b) => setActiveBatchId(b.id)}
+      />
+
       <ScheduleMeetingModal
         isOpen={isScheduleModal}
         onClose={() => setIsScheduleModal(false)}
@@ -509,8 +552,8 @@ export const CompanyAdminView: React.FC = () => {
       <CompanyResourceModal
         isOpen={isUploadResourceModal}
         onClose={() => setIsUploadResourceModal(false)}
-        onUpload={(title, desc, fileType, fileSize) =>
-          addResource(title, desc, fileType, fileSize)
+        onUpload={(title, desc, fileType, fileSize, fileUrl, fileName, externalLink) =>
+          addResource(title, desc, fileType, fileSize, fileUrl, fileName, externalLink)
         }
       />
 

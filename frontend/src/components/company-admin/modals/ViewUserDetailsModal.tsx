@@ -1,6 +1,7 @@
 import React from 'react';
 import { User } from '../../../types';
 import { Eye, Edit2 } from 'lucide-react';
+import { UserAvatar } from '../../common/UserAvatar';
 
 interface ViewUserDetailsModalProps {
   viewingUser: User | null;
@@ -24,14 +25,7 @@ export const ViewUserDetailsModal: React.FC<ViewUserDetailsModalProps> = ({
       <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 space-y-4">
         <div className="flex justify-between items-start border-b border-slate-100 pb-3">
           <div className="flex items-center space-x-3">
-            <img
-              src={
-                viewingUser.avatar ||
-                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-              }
-              alt={viewingUser.name}
-              className="w-12 h-12 rounded-full object-cover border border-slate-300"
-            />
+            <UserAvatar name={viewingUser.name} size="lg" />
             <div>
               <h3 className="font-bold text-slate-900 text-base">{viewingUser.name}</h3>
               <p className="text-xs text-slate-500 font-mono">{viewingUser.email}</p>
@@ -100,6 +94,45 @@ export const ViewUserDetailsModal: React.FC<ViewUserDetailsModalProps> = ({
               {viewingUser.status}
             </span>
           </div>
+          {(viewingUser.linkedin || viewingUser.github || viewingUser.portfolioUrl) && (
+            <div className="pt-2 border-t border-slate-100 space-y-1.5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                Connected Profiles
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {viewingUser.linkedin && (
+                  <a
+                    href={viewingUser.linkedin.startsWith('http') ? viewingUser.linkedin : `https://${viewingUser.linkedin}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-bold text-[#0077b5] hover:underline bg-[#0077b5]/10 px-2 py-0.5 rounded"
+                  >
+                    LinkedIn
+                  </a>
+                )}
+                {viewingUser.github && (
+                  <a
+                    href={viewingUser.github.startsWith('http') ? viewingUser.github : `https://${viewingUser.github}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-bold text-slate-800 hover:underline bg-slate-100 px-2 py-0.5 rounded"
+                  >
+                    GitHub
+                  </a>
+                )}
+                {viewingUser.portfolioUrl && (
+                  <a
+                    href={viewingUser.portfolioUrl.startsWith('http') ? viewingUser.portfolioUrl : `https://${viewingUser.portfolioUrl}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] font-bold text-indigo-600 hover:underline bg-indigo-50 px-2 py-0.5 rounded"
+                  >
+                    Website
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between pt-2 border-t border-slate-100">

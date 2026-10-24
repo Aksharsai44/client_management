@@ -15,6 +15,9 @@ export interface User {
   designation?: string;
   joinedDate?: string;
   assignedCompanyAdminIds?: string[]; // For product_admin
+  linkedin?: string;
+  github?: string;
+  portfolioUrl?: string;
 }
 
 export interface DemoRequest {
@@ -169,6 +172,14 @@ export interface CommunityPost {
   links?: PostLink[];
 }
 
+export interface ChatAttachment {
+  name: string;
+  type: string; // 'image' | 'video' | 'document'
+  url: string;
+  size?: string;
+  thumbnailUrl?: string;
+}
+
 export interface ChatMessage {
   id: string;
   batchId: string;
@@ -181,11 +192,12 @@ export interface ChatMessage {
   text: string;
   timestamp: string;
   status: 'sent' | 'delivered' | 'read';
-  attachment?: {
-    name: string;
-    type: string;
-    url: string;
-  };
+  attachment?: ChatAttachment;
+  attachments?: ChatAttachment[];
+  reactions?: Record<string, string[]>;
+  createdAt?: string;
+  isEdited?: boolean;
+  deletedForUserIds?: string[];
 }
 
 export interface ResourceItem {
@@ -201,6 +213,8 @@ export interface ResourceItem {
   fileSize: string;
   uploadedAt: string;
   fileUrl: string;
+  fileName?: string;
+  externalLink?: string;
   reviews?: ResourceReview[];
 }
 
@@ -216,6 +230,7 @@ export interface ResourceReview {
 }
 
 export interface CompanyAdminMetric {
+  id?: string;
   companyAdminId: string;
   companyName: string;
   adminName: string;
@@ -234,6 +249,14 @@ export interface CompanyAdminMetric {
   tier?: string;
   status?: 'active' | 'paused';
   createdAt?: string;
+  // Receiving bank & UPI payout details
+  bankName?: string;
+  accountHolderName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  accountType?: string;
+  upiId?: string;
+  qrCodeUrl?: string;
 }
 
 export type CompanyOrganization = CompanyAdminMetric;
@@ -260,8 +283,60 @@ export interface IntegrationSettings {
 }
 
 export interface CompanySettings {
+  id?: string;
+  companyId?: string;
   allowChatWithUsers: boolean;
   whatsappAlertsEnabled: boolean;
   emailAlertsEnabled: boolean;
   universalDefaultPassword: string;
+  updatedAt?: string;
+}
+
+export interface ProjectMOU {
+  id: string;
+  companyId: string;
+  clientCompanyId: string;
+  clientName: string;
+  clientEmail: string;
+  projectTitle: string;
+  description: string;
+  totalAmount: number;
+  monthlyAmount: number;
+  currency: string;
+  currencySymbol: string;
+  billingFrequency: 'monthly' | 'quarterly' | 'milestone' | 'annual';
+  billingDayOfMonth: number;
+  startDate: string;
+  endDate: string;
+  status: 'draft' | 'active' | 'completed' | 'paused';
+  mouTerms: string;
+  signedDate?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PaymentRecord {
+  id: string;
+  projectMouId?: string;
+  companyId: string;
+  clientCompanyId: string;
+  clientName: string;
+  clientEmail: string;
+  title: string;
+  invoiceNumber: string;
+  billingMonth: string; // e.g. "2026-10"
+  amount: number;
+  currency: string;
+  currencySymbol: string;
+  dueDate: string;
+  status: 'paid' | 'pending' | 'overdue';
+  paidDate?: string;
+  paymentMethod?: string;
+  transactionReference?: string;
+  notes?: string;
+  receiptUrl?: string;
+  reminderSent?: boolean;
+  reminderSentAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }

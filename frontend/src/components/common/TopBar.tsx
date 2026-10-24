@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { UserRole } from '../../types';
+import { UserAvatar } from './UserAvatar';
 import {
   Layers,
   ChevronDown,
@@ -134,11 +135,7 @@ export const TopBar: React.FC = () => {
             onClick={() => setShowProfileMenu(!showProfileMenu)}
             className="flex items-center space-x-2 pl-2 focus:outline-none"
           >
-            <img
-              src={currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
-              alt={currentUser.name}
-              className="w-8 h-8 rounded-full object-cover border border-slate-300"
-            />
+            <UserAvatar name={currentUser.name} size="sm" />
             <div className="hidden xl:block text-left">
               <div className="text-xs font-semibold text-slate-800 leading-tight">
                 {currentUser.name}

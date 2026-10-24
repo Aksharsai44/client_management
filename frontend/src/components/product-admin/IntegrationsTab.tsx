@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CompanyAdminMetric, IntegrationSettings, User } from '../../types';
 import { useApp } from '../../context/AppContext';
+import { UserAvatar } from '../common/UserAvatar';
 import {
   Sliders,
   MessageSquare,
@@ -124,6 +125,16 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
       setDemoWhatsappInput(integrationSettings.demoWhatsappNumber);
     }
   }, [integrationSettings.demoWhatsappNumber]);
+
+  // AI API Key state
+  const [apiKeyInput, setApiKeyInput] = useState(integrationSettings.apiKey || '');
+  const [keySaved, setKeySaved] = useState(false);
+
+  useEffect(() => {
+    if (integrationSettings.apiKey !== undefined) {
+      setApiKeyInput(integrationSettings.apiKey);
+    }
+  }, [integrationSettings.apiKey]);
 
   // Filter Product Admins list (Super admins and Scoped product admins)
   const productAdmins = users.filter(
@@ -569,17 +580,7 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
                           {/* Name & Avatar */}
                           <td className="py-3 px-3">
                             <div className="flex items-center space-x-2.5">
-                              {admin.avatar ? (
-                                <img
-                                  src={admin.avatar}
-                                  alt={admin.name}
-                                  className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                                />
-                              ) : (
-                                <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs uppercase">
-                                  {admin.name.charAt(0)}
-                                </div>
-                              )}
+                              <UserAvatar name={admin.name} size="sm" />
                               <div>
                                 <span className="font-bold text-slate-900 block">{admin.name}</span>
                                 <span className="text-[10px] text-slate-400">
@@ -943,24 +944,41 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1">
-            API Secret Key
+          <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+            <span>API Secret Key</span>
+            <span className="text-[10px] text-purple-600 font-semibold">PostgreSQL Real-Time Synced</span>
           </label>
           <div className="flex items-center space-x-2">
             <input
               type="password"
-              value={integrationSettings.apiKey}
-              onChange={(e) =>
-                updateIntegrationSettings({ apiKey: e.target.value })
-              }
+              value={apiKeyInput}
+              onChange={(e) => {
+                setApiKeyInput(e.target.value);
+                setKeySaved(false);
+              }}
               placeholder="Enter provider API key (e.g. AIzaSy... or sk-...)"
               className="flex-1 px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono focus:ring-2 focus:ring-purple-500 focus:outline-hidden bg-slate-50"
             />
             <button
-              onClick={() => alert('API Key verified & connected to transcript pipeline!')}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              type="button"
+              onClick={() => {
+                updateIntegrationSettings({ apiKey: apiKeyInput.trim() });
+                setKeySaved(true);
+                setTimeout(() => setKeySaved(false), 3000);
+              }}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center space-x-1.5"
             >
-              Save Key
+              {keySaved ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-white" />
+                  <span>Key Saved!</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save Key</span>
+                </>
+              )}
             </button>
           </div>
         </div>

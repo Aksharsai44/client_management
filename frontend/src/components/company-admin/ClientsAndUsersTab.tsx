@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { ViewClientCompanyModal } from './modals/ViewClientCompanyModal';
+import { UserAvatar } from '../common/UserAvatar';
 
 interface ClientsAndUsersTabProps {
   companySettings: CompanySettings;
@@ -399,14 +400,7 @@ export const ClientsAndUsersTab: React.FC<ClientsAndUsersTabProps> = ({
                 <tr key={u.id} className="hover:bg-slate-50/60 transition-colors">
                   <td className="py-2.5 px-3">
                     <div className="flex items-center space-x-2.5">
-                      <img
-                        src={
-                          u.avatar ||
-                          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-                        }
-                        alt={u.name}
-                        className="w-7 h-7 rounded-full object-cover border border-slate-300"
-                      />
+                      <UserAvatar name={u.name} size="sm" className="w-7 h-7 text-[11px]" />
                       <div>
                         <span className="font-bold text-slate-900">{u.name}</span>
                         <div className="flex items-center space-x-1.5 mt-0.5 flex-wrap">

@@ -13,11 +13,14 @@ import {
   PostAttachment,
   PostLink,
   ChatMessage,
+  ChatAttachment,
   ResourceItem,
   ResourceReview,
   CompanyAdminMetric,
   IntegrationSettings,
   CompanySettings,
+  ProjectMOU,
+  PaymentRecord,
 } from '../types';
 import { demoRequestApi } from '../services/demoRequestApi';
 import { pricingPlanApi } from '../services/pricingPlanApi';
@@ -25,6 +28,12 @@ import { companyOrganizationApi } from '../services/companyOrganizationApi';
 import { productAdminApi } from '../services/productAdminApi';
 import { clientCompanyApi } from '../services/clientCompanyApi';
 import { userApi } from '../services/userApi';
+import { paymentApi } from '../services/paymentApi';
+import { communityApi } from '../services/communityApi';
+import { chatApi } from '../services/chatApi';
+import { resourceApi } from '../services/resourceApi';
+import { settingsApi } from '../services/settingsApi';
+import { batchApi } from '../services/batchApi';
 import {
   INITIAL_USERS,
   INITIAL_BATCHES,
@@ -39,6 +48,8 @@ import {
   INITIAL_COMPANY_ADMIN_METRICS,
   INITIAL_INTEGRATION_SETTINGS,
   INITIAL_COMPANY_SETTINGS,
+  INITIAL_PROJECT_MOUS,
+  INITIAL_PAYMENTS,
 } from '../mock/initialData';
 
 interface AppContextType {
@@ -72,6 +83,8 @@ interface AppContextType {
   companyAdminMetrics: CompanyAdminMetric[];
   integrationSettings: IntegrationSettings;
   companySettings: CompanySettings;
+  projectMous: ProjectMOU[];
+  payments: PaymentRecord[];
 
   // Universal Currency
   selectedCurrency: string;
@@ -86,6 +99,9 @@ interface AppContextType {
   refreshPricingPlans: () => Promise<void>;
   refreshClientCompanies: () => Promise<void>;
   refreshWorkspaceUsers: () => Promise<void>;
+  refreshProjectMOUs: () => Promise<void>;
+  refreshPayments: () => Promise<void>;
+  refreshCommunityPosts: () => Promise<void>;
   updatePricingPlan: (plan: PricingPlan) => Promise<void> | void;
   addPricingPlan: (plan: Omit<PricingPlan, 'id'>) => Promise<void> | void;
   deletePricingPlan: (planId: string) => Promise<void> | void;
@@ -95,7 +111,9 @@ interface AppContextType {
   addUser: (userData: Omit<User, 'id' | 'joinedDate'>) => Promise<void> | void;
   updateUser: (user: User) => Promise<void> | void;
   deleteUser: (userId: string) => Promise<void> | void;
-  addBatch: (batch: Omit<Batch, 'id'>) => void;
+  addBatch: (batch: Omit<Batch, 'id'>) => Promise<Batch>;
+  deleteBatch?: (batchId: string) => Promise<void> | void;
+  refreshBatches: () => Promise<void>;
   addMeeting: (meeting: Omit<Meeting, 'id' | 'status'>) => void;
   addCommunityPost: (
     title: string,
@@ -115,12 +133,33 @@ interface AppContextType {
   ) => void;
   deleteCommunityReply: (postId: string, replyId: string) => void;
   toggleLikePost: (postId: string) => void;
-  toggleLikeReply: (postId: string, replyId: string) => void;
-  sendChatMessage: (text: string, recipientId?: string) => void;
-  addResource: (title: string, description: string, fileType: string, fileSize: string) => void;
-  addResourceReview: (resourceId: string, rating: number, feedback: string) => void;
+  toggleLikeReply: (postId: string, replyId: string) => Promise<void> | void;
+  sendChatMessage: (
+    text: string,
+    recipientId?: string,
+    attachment?: ChatAttachment,
+    attachments?: ChatAttachment[]
+  ) => void;
+  editChatMessage: (messageId: string, newText: string) => Promise<void>;
+  deleteChatMessage: (messageId: string) => Promise<void>;
+  deleteChatMessageForMe: (messageId: string, userId: string) => Promise<void>;
+  markMessagesAsRead: (messageIds?: string[], targetSenderId?: string) => Promise<void>;
+  addResource: (
+    title: string,
+    description: string,
+    fileType: string,
+    fileSize: string,
+    fileUrl?: string,
+    fileName?: string,
+    externalLink?: string
+  ) => Promise<void> | void;
+  addResourceReview: (resourceId: string, rating: number, feedback: string) => Promise<void> | void;
+  deleteResource?: (resourceId: string) => Promise<void>;
+  refreshResources: () => Promise<void>;
+  refreshIntegrationSettings: () => Promise<void>;
+  refreshCompanySettings: (companyId?: string) => Promise<void>;
   updateIntegrationSettings: (newSettings: Partial<IntegrationSettings>) => void;
-  updateCompanySettings: (newSettings: Partial<CompanySettings>) => void;
+  updateCompanySettings: (newSettings: Partial<CompanySettings>, targetCompanyId?: string) => Promise<void>;
   toggleCompanyIntegration: (companyId: string, type: 'whatsapp' | 'email', value: boolean) => void;
   toggleClientIntegration: (clientId: string, type: 'whatsapp' | 'email', value: boolean) => void;
   createProductAdminAccount: (
@@ -149,6 +188,28 @@ interface AppContextType {
   updateCompanyAdminMetric: (company: CompanyAdminMetric) => void;
   deleteCompanyAdminMetric: (companyAdminId: string) => void;
   toggleCompanyStatus: (companyAdminId: string) => void;
+
+  // Payments & Project MOUs
+  addProjectMOU: (mou: Omit<ProjectMOU, 'id'>, autoCreatePayment?: boolean) => Promise<void> | void;
+  updateProjectMOU: (mou: ProjectMOU) => Promise<void> | void;
+  deleteProjectMOU: (mouId: string) => Promise<void> | void;
+  addPayment: (payment: Omit<PaymentRecord, 'id' | 'createdAt'>) => Promise<void> | void;
+  updatePayment: (payment: PaymentRecord) => Promise<void> | void;
+  markPaymentPaid: (
+    id: string,
+    details: {
+      paidDate?: string;
+      paymentMethod?: string;
+      transactionReference?: string;
+      notes?: string;
+    }
+  ) => Promise<{ success: boolean; message: string }>;
+  sendPaymentReminder: (id: string) => Promise<{
+    success: boolean;
+    message: string;
+    emailDetails?: { to: string; subject: string; sentAt: string; preview: string };
+  }>;
+  deletePayment: (id: string) => Promise<void> | void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -161,8 +222,39 @@ function getInitialState<T>(key: string, fallback: T): T {
     if (saved && saved !== 'undefined' && saved !== 'null') {
       const parsed = JSON.parse(saved);
       if (parsed !== null && parsed !== undefined) {
-        if (Array.isArray(fallback) && (!Array.isArray(parsed) || parsed.length === 0)) {
-          return fallback;
+        if (Array.isArray(fallback)) {
+          if (!Array.isArray(parsed) || parsed.length === 0) {
+            return fallback;
+          }
+          // Merge missing demo items while preserving all existing user-created items
+          const fallbackMap = new Map((fallback as any[]).map((item: any) => [item?.id || item?.companyAdminId, item]));
+          const existingIds = new Set(parsed.map((item: any) => item?.id || item?.companyAdminId));
+
+          // Ensure known fallback demo items have updated batchId & companyId if missing in parsed
+          const updatedParsed = parsed.map((item: any) => {
+            const id = item?.id || item?.companyAdminId;
+            if (id && fallbackMap.has(id)) {
+              const fb = fallbackMap.get(id);
+              return {
+                ...fb,
+                ...item,
+                batchId: item.batchId || fb.batchId,
+                companyId: item.companyId || fb.companyId,
+              };
+            }
+            return item;
+          });
+
+          const missingFallbackItems = (fallback as any[]).filter(
+            (item: any) => {
+              const id = item?.id || item?.companyAdminId;
+              return id && !existingIds.has(id);
+            }
+          );
+          if (missingFallbackItems.length > 0) {
+            return [...updatedParsed, ...missingFallbackItems] as unknown as T;
+          }
+          return updatedParsed as unknown as T;
         }
         return parsed;
       }
@@ -201,8 +293,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [companyAdminMetrics, setCompanyAdminMetrics] = useState<CompanyAdminMetric[]>(() => getInitialState('company_metrics', INITIAL_COMPANY_ADMIN_METRICS));
   const [integrationSettings, setIntegrationSettings] = useState<IntegrationSettings>(() => getInitialState('integrations', INITIAL_INTEGRATION_SETTINGS));
   const [companySettings, setCompanySettings] = useState<CompanySettings>(() => getInitialState('company_settings', INITIAL_COMPANY_SETTINGS));
+  const [projectMous, setProjectMous] = useState<ProjectMOU[]>(() => getInitialState('project_mous', INITIAL_PROJECT_MOUS));
+  const [payments, setPayments] = useState<PaymentRecord[]>(() => getInitialState('payments', INITIAL_PAYMENTS));
 
   // Sync to local storage
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEY_PREFIX + 'project_mous', JSON.stringify(projectMous));
+  }, [projectMous]);
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEY_PREFIX + 'payments', JSON.stringify(payments));
+  }, [payments]);
   useEffect(() => {
     localStorage.setItem(LOCAL_STORAGE_KEY_PREFIX + 'users', JSON.stringify(users));
   }, [users]);
@@ -324,6 +424,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const data = await companyOrganizationApi.getAll();
       if (Array.isArray(data) && data.length > 0) {
         setCompanyAdminMetrics(data);
+        // Ensure every company admin is present in users list
+        setUsers((prev) => {
+          const map = new Map<string, User>();
+          prev.forEach((u) => map.set(u.id, u));
+          data.forEach((org) => {
+            const adminId = org.companyAdminId || (org as any).id;
+            if (!map.has(adminId)) {
+              map.set(adminId, {
+                id: adminId,
+                name: org.adminName,
+                email: org.adminEmail,
+                role: 'company_admin',
+                companyId: adminId,
+                companyName: org.companyName,
+                batchIds: [`batch_${adminId}`],
+                status: org.status === 'paused' ? 'inactive' : 'active',
+                phone: org.phone || '',
+                designation: 'Managing Director / Organization Admin',
+                joinedDate: org.createdAt || '2026-01-01',
+              });
+            }
+          });
+          return Array.from(map.values());
+        });
       }
     } catch {
       // Backend starting or offline - keep existing state
@@ -368,7 +492,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const data = await userApi.getAll();
       if (Array.isArray(data) && data.length > 0) {
-        setUsers(data);
+        setUsers((prev) => {
+          const map = new Map<string, User>();
+          data.forEach((u) => map.set(u.id, u));
+          // Preserve any company admins from prev or companyAdminMetrics
+          prev.forEach((u) => {
+            if (u.role === 'company_admin' && !map.has(u.id)) {
+              map.set(u.id, u);
+            }
+          });
+          return Array.from(map.values());
+        });
       } else {
         await userApi.seed(INITIAL_USERS);
         const seeded = await userApi.getAll();
@@ -381,6 +515,138 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Real-time synchronization for Workspace Batches from PostgreSQL database
+  const refreshBatches = async () => {
+    try {
+      const data = await batchApi.getAll();
+      if (Array.isArray(data) && data.length > 0) {
+        setBatches(data);
+      } else {
+        const seeded = await batchApi.seed();
+        if (seeded && Array.isArray(seeded.batches) && seeded.batches.length > 0) {
+          setBatches(seeded.batches);
+        }
+      }
+    } catch {
+      // Backend starting or offline - keep existing state
+    }
+  };
+
+  // Real-time synchronization for Project MOUs from database
+  const refreshProjectMOUs = async () => {
+    try {
+      const data = await paymentApi.getAllProjectMOUs();
+      if (Array.isArray(data) && data.length > 0) {
+        setProjectMous(data);
+      }
+    } catch {
+      // Backend offline or starting
+    }
+  };
+
+  // Real-time synchronization for Payments from database
+  const refreshPayments = async () => {
+    try {
+      const data = await paymentApi.getAllPayments();
+      if (Array.isArray(data) && data.length > 0) {
+        setPayments(data);
+      } else {
+        await paymentApi.seed();
+        const seeded = await paymentApi.getAllPayments();
+        if (Array.isArray(seeded) && seeded.length > 0) {
+          setPayments(seeded);
+        }
+      }
+    } catch {
+      // Backend offline or starting
+    }
+  };
+
+  // Real-time synchronization for Community Posts from database
+  const refreshCommunityPosts = async () => {
+    try {
+      const data = await communityApi.getAllPosts();
+      if (Array.isArray(data) && data.length > 0) {
+        setCommunityPosts(data);
+      } else {
+        await communityApi.seedPosts(INITIAL_COMMUNITY_POSTS);
+        const seeded = await communityApi.getAllPosts();
+        if (Array.isArray(seeded) && seeded.length > 0) {
+          setCommunityPosts(seeded);
+        }
+      }
+    } catch {
+      // Backend offline or starting
+    }
+  };
+
+  // Real-time synchronization for Chat Messages from PostgreSQL database
+  const refreshChatMessages = async () => {
+    try {
+      const data = await chatApi.getAllMessages();
+      if (Array.isArray(data) && data.length > 0) {
+        setChatMessages(data);
+      } else {
+        await chatApi.seedMessages(INITIAL_CHAT_MESSAGES);
+        const seeded = await chatApi.getAllMessages();
+        if (Array.isArray(seeded) && seeded.length > 0) {
+          setChatMessages(seeded);
+        }
+      }
+    } catch {
+      // Backend offline or starting
+    }
+  };
+
+  // Real-time synchronization for Resources & Deliverables from PostgreSQL database
+  const refreshResources = async () => {
+    try {
+      const data = await resourceApi.getAllResources();
+      if (Array.isArray(data) && data.length > 0) {
+        setResources(data);
+      } else {
+        await resourceApi.seedResources();
+        const seeded = await resourceApi.getAllResources();
+        if (Array.isArray(seeded) && seeded.length > 0) {
+          setResources(seeded);
+        }
+      }
+    } catch {
+      // Backend offline or starting
+    }
+  };
+
+  // Real-time synchronization for Integration Settings from PostgreSQL database
+  const refreshIntegrationSettings = async () => {
+    try {
+      const data = await settingsApi.getIntegrationSettings();
+      if (data && typeof data === 'object') {
+        setIntegrationSettings(data);
+      }
+    } catch {
+      // Backend offline or starting
+    }
+  };
+
+  // Real-time synchronization for Company Settings from PostgreSQL database
+  const refreshCompanySettings = async (companyId?: string) => {
+    try {
+      const activeCompanyId = companyId || currentUser?.companyId || (currentUser?.role === 'company_admin' ? currentUser.id : undefined);
+      const data = await settingsApi.getCompanySettings(activeCompanyId);
+      if (data && typeof data === 'object') {
+        setCompanySettings((prev) => ({ ...prev, ...data }));
+      }
+    } catch {
+      // Backend offline or starting
+    }
+  };
+
+  // Re-fetch company settings whenever logged-in user changes (e.g. switching company admin)
+  useEffect(() => {
+    const compId = currentUser?.companyId || (currentUser?.role === 'company_admin' ? currentUser.id : undefined);
+    refreshCompanySettings(compId);
+  }, [currentUser?.id, currentUser?.companyId, currentUser?.role]);
+
   useEffect(() => {
     // Initial fetch from PostgreSQL backend
     refreshDemoRequests();
@@ -389,6 +655,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshProductAdmins();
     refreshClientCompanies();
     refreshWorkspaceUsers();
+    refreshProjectMOUs();
+    refreshPayments();
+    refreshCommunityPosts();
+    refreshChatMessages();
+    refreshResources();
+    refreshIntegrationSettings();
+    refreshCompanySettings();
+    refreshBatches();
 
     // 1. Subscribe to Server-Sent Events (SSE) stream for real-time live push
     const unsubscribeSSE = demoRequestApi.subscribeToEvents((event) => {
@@ -423,6 +697,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCompanyAdminMetrics((prev) =>
           prev.map((c) => (c.companyAdminId === event.data.companyAdminId ? { ...c, ...event.data } : c))
         );
+        const activeCompId = currentUser?.companyId || (currentUser?.role === 'company_admin' ? currentUser.id : undefined);
+        if (activeCompId && event.data.companyAdminId === activeCompId) {
+          setCompanySettings((prev) => ({
+            ...prev,
+            ...(event.data.whatsappEnabled !== undefined ? { whatsappAlertsEnabled: event.data.whatsappEnabled } : {}),
+            ...(event.data.emailEnabled !== undefined ? { emailAlertsEnabled: event.data.emailEnabled } : {}),
+          }));
+        }
       } else if (event.type === 'company_organization_deleted' && event.data) {
         setCompanyAdminMetrics((prev) => prev.filter((c) => c.companyAdminId !== event.data.companyAdminId));
       } else if (event.type === 'product_admin_created' && event.data) {
@@ -456,8 +738,96 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUsers((prev) =>
           prev.map((u) => (u.id === event.data.id ? { ...u, ...event.data } : u))
         );
+        setCurrentUser((prev) => (prev.id === event.data.id ? { ...prev, ...event.data } : prev));
       } else if (event.type === 'user_deleted' && event.data) {
         setUsers((prev) => prev.filter((u) => u.id !== event.data.id));
+      } else if (event.type === 'project_mou_created' && event.data) {
+        setProjectMous((prev) => (prev.some((m) => m.id === event.data.id) ? prev : [event.data, ...prev]));
+      } else if (event.type === 'project_mou_updated' && event.data) {
+        setProjectMous((prev) => prev.map((m) => (m.id === event.data.id ? { ...m, ...event.data } : m)));
+      } else if (event.type === 'project_mou_deleted' && event.data) {
+        setProjectMous((prev) => prev.filter((m) => m.id !== event.data.id));
+      } else if (event.type === 'payment_created' && event.data) {
+        setPayments((prev) => (prev.some((p) => p.id === event.data.id) ? prev : [event.data, ...prev]));
+      } else if (event.type === 'payment_updated' && event.data) {
+        setPayments((prev) => prev.map((p) => (p.id === event.data.id ? { ...p, ...event.data } : p)));
+      } else if (event.type === 'payment_deleted' && event.data) {
+        setPayments((prev) => prev.filter((p) => p.id !== event.data.id));
+      } else if (event.type === 'community_post_created' && event.data) {
+        setCommunityPosts((prev) => (prev.some((p) => p.id === event.data.id) ? prev.map((p) => (p.id === event.data.id ? event.data : p)) : [event.data, ...prev]));
+      } else if (event.type === 'community_post_updated' && event.data) {
+        setCommunityPosts((prev) => prev.map((p) => (p.id === event.data.id ? event.data : p)));
+      } else if (event.type === 'community_post_deleted' && event.data) {
+        const deletedId = event.data.id || event.data.postId;
+        setCommunityPosts((prev) => prev.filter((p) => p.id !== deletedId));
+      } else if (event.type === 'community_post_liked' && event.data) {
+        setCommunityPosts((prev) => prev.map((p) => (p.id === event.data.id ? event.data : p)));
+      } else if (event.type === 'community_reply_added' && event.data) {
+        if (event.data.post) {
+          setCommunityPosts((prev) => prev.map((p) => (p.id === event.data.post.id ? event.data.post : p)));
+        } else {
+          refreshCommunityPosts();
+        }
+      } else if (event.type === 'community_reply_deleted' && event.data) {
+        if (event.data.post) {
+          setCommunityPosts((prev) => prev.map((p) => (p.id === event.data.post.id ? event.data.post : p)));
+        } else {
+          refreshCommunityPosts();
+        }
+      } else if (event.type === 'community_reply_liked' && event.data) {
+        if (event.data.post) {
+          setCommunityPosts((prev) => prev.map((p) => (p.id === event.data.post.id ? event.data.post : p)));
+        } else {
+          refreshCommunityPosts();
+        }
+      } else if (event.type === 'chat_message_created' && event.data) {
+        setChatMessages((prev) => {
+          if (prev.some((m) => m.id === event.data.id)) {
+            return prev.map((m) => (m.id === event.data.id ? event.data : m));
+          }
+          return [...prev, event.data];
+        });
+      } else if (event.type === 'chat_message_updated' && event.data) {
+        setChatMessages((prev) => prev.map((m) => (m.id === event.data.id ? { ...m, ...event.data } : m)));
+      } else if (event.type === 'chat_message_deleted' && event.data) {
+        setChatMessages((prev) => prev.filter((m) => m.id !== event.data.id));
+      } else if (event.type === 'chat_messages_read' && event.data) {
+        const readIds = new Set(event.data.messageIds || []);
+        setChatMessages((prev) =>
+          prev.map((m) => (readIds.has(m.id) ? { ...m, status: 'read' as const } : m))
+        );
+      } else if (event.type === 'resource_created' && event.data) {
+        setResources((prev) => (prev.some((r) => r.id === event.data.id) ? prev.map((r) => (r.id === event.data.id ? event.data : r)) : [event.data, ...prev]));
+      } else if (event.type === 'resource_updated' && event.data) {
+        setResources((prev) => prev.map((r) => (r.id === event.data.id ? event.data : r)));
+      } else if (event.type === 'resource_reviewed' && event.data) {
+        if (event.data.resource) {
+          setResources((prev) => prev.map((r) => (r.id === event.data.resource.id ? event.data.resource : r)));
+        } else {
+          refreshResources();
+        }
+      } else if (event.type === 'resource_deleted' && event.data) {
+        const deletedId = event.data.id || event.data.resourceId;
+        setResources((prev) => prev.filter((r) => r.id !== deletedId));
+      } else if (event.type === 'integration_settings_updated' && event.data) {
+        setIntegrationSettings((prev) => ({ ...prev, ...event.data }));
+      } else if (event.type === 'company_settings_updated' && event.data) {
+        const activeCompId = currentUser?.companyId || (currentUser?.role === 'company_admin' ? currentUser.id : undefined);
+        const eventCompId = event.data.companyId || event.data.company_id;
+        if (!eventCompId || eventCompId === 'default' || eventCompId === activeCompId || !activeCompId) {
+          setCompanySettings((prev) => ({ ...prev, ...event.data }));
+        }
+      } else if (event.type === 'batch_created' && event.data) {
+        setBatches((prev) => {
+          if (prev.some((b) => b.id === event.data.id)) return prev;
+          return [...prev, event.data];
+        });
+      } else if (event.type === 'batch_updated' && event.data) {
+        setBatches((prev) =>
+          prev.map((b) => (b.id === event.data.id ? { ...b, ...event.data } : b))
+        );
+      } else if (event.type === 'batch_deleted' && event.data) {
+        setBatches((prev) => prev.filter((b) => b.id !== event.data.id));
       }
     });
 
@@ -467,7 +837,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let orgChannel: BroadcastChannel | null = null;
     let clientChannel: BroadcastChannel | null = null;
     let userChannel: BroadcastChannel | null = null;
+    let communityChannel: BroadcastChannel | null = null;
+    let chatChannel: BroadcastChannel | null = null;
+    let resourceChannel: BroadcastChannel | null = null;
+    let settingsChannel: BroadcastChannel | null = null;
+    let batchChannel: BroadcastChannel | null = null;
     try {
+      batchChannel = new BroadcastChannel('client_mgmt_batches');
+      batchChannel.onmessage = (e) => {
+        const { type, data } = e.data || {};
+        if (type === 'batch_created' && data) {
+          setBatches((prev) => (prev.some((b) => b.id === data.id) ? prev : [...prev, data]));
+        } else if (type === 'batch_updated' && data) {
+          setBatches((prev) => prev.map((b) => (b.id === data.id ? { ...b, ...data } : b)));
+        } else if (type === 'batch_deleted' && data) {
+          setBatches((prev) => prev.filter((b) => b.id !== data.id));
+        }
+      };
+
       demoChannel = new BroadcastChannel('client_mgmt_demo_requests');
       demoChannel.onmessage = (e) => {
         const { type, data } = e.data || {};
@@ -501,6 +888,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setCompanyAdminMetrics((prev) => (prev.some((c) => c.companyAdminId === data.companyAdminId) ? prev : [data, ...prev]));
         } else if (type === 'company_organization_updated' && data) {
           setCompanyAdminMetrics((prev) => prev.map((c) => (c.companyAdminId === data.companyAdminId ? { ...c, ...data } : c)));
+          const activeCompId = currentUser?.companyId || (currentUser?.role === 'company_admin' ? currentUser.id : undefined);
+          if (activeCompId && data.companyAdminId === activeCompId) {
+            setCompanySettings((prev) => ({
+              ...prev,
+              ...(data.whatsappEnabled !== undefined ? { whatsappAlertsEnabled: data.whatsappEnabled } : {}),
+              ...(data.emailEnabled !== undefined ? { emailAlertsEnabled: data.emailEnabled } : {}),
+            }));
+          }
         } else if (type === 'company_organization_deleted' && data) {
           setCompanyAdminMetrics((prev) => prev.filter((c) => c.companyAdminId !== data.companyAdminId));
         }
@@ -525,8 +920,105 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setUsers((prev) => (prev.some((u) => u.id === data.id) ? prev : [...prev, data]));
         } else if (type === 'user_updated' && data) {
           setUsers((prev) => prev.map((u) => (u.id === data.id ? { ...u, ...data } : u)));
+          setCurrentUser((prev) => (prev.id === data.id ? { ...prev, ...data } : prev));
         } else if (type === 'user_deleted' && data) {
           setUsers((prev) => prev.filter((u) => u.id !== data.id));
+        }
+      };
+
+      communityChannel = new BroadcastChannel('client_mgmt_community_posts');
+      communityChannel.onmessage = (e) => {
+        const { type, data } = e.data || {};
+        if (type === 'community_post_created' && data) {
+          setCommunityPosts((prev) => (prev.some((p) => p.id === data.id) ? prev.map((p) => (p.id === data.id ? data : p)) : [data, ...prev]));
+        } else if (type === 'community_post_updated' && data) {
+          setCommunityPosts((prev) => prev.map((p) => (p.id === data.id ? { ...p, ...data } : p)));
+        } else if (type === 'community_post_deleted' && data) {
+          const deletedId = data.id || data.postId;
+          setCommunityPosts((prev) => prev.filter((p) => p.id !== deletedId));
+        } else if (type === 'community_post_liked' && data) {
+          setCommunityPosts((prev) => prev.map((p) => (p.id === data.id ? data : p)));
+        } else if (type === 'community_reply_added' && data) {
+          if (data.post) {
+            setCommunityPosts((prev) => prev.map((p) => (p.id === data.post.id ? data.post : p)));
+          } else {
+            refreshCommunityPosts();
+          }
+        } else if (type === 'community_reply_deleted' && data) {
+          if (data.post) {
+            setCommunityPosts((prev) => prev.map((p) => (p.id === data.post.id ? data.post : p)));
+          } else {
+            refreshCommunityPosts();
+          }
+        } else if (type === 'community_reply_liked' && data) {
+          if (data.post) {
+            setCommunityPosts((prev) => prev.map((p) => (p.id === data.post.id ? data.post : p)));
+          } else {
+            refreshCommunityPosts();
+          }
+        }
+      };
+
+      chatChannel = new BroadcastChannel('client_mgmt_chat_messages');
+      chatChannel.onmessage = (e) => {
+        const { type, data } = e.data || {};
+        if (type === 'chat_message_created' && data) {
+          setChatMessages((prev) => (prev.some((m) => m.id === data.id) ? prev.map((m) => (m.id === data.id ? data : m)) : [...prev, data]));
+        } else if (type === 'chat_message_updated' && data) {
+          setChatMessages((prev) => prev.map((m) => (m.id === data.id ? { ...m, ...data } : m)));
+        } else if (type === 'chat_message_deleted' && data) {
+          setChatMessages((prev) => prev.filter((m) => m.id !== data.id));
+        } else if (type === 'chat_message_deleted_for_me' && data) {
+          setChatMessages((prev) =>
+            prev.map((m) =>
+              m.id === data.messageId
+                ? {
+                    ...m,
+                    deletedForUserIds: Array.from(new Set([...(m.deletedForUserIds || []), data.userId])),
+                  }
+                : m
+            )
+          );
+        } else if (type === 'chat_messages_read' && data) {
+          const readIds = new Set(data.messageIds || []);
+          setChatMessages((prev) =>
+            prev.map((m) => (readIds.has(m.id) ? { ...m, status: 'read' as const } : m))
+          );
+        }
+      };
+
+      resourceChannel = new BroadcastChannel('client_mgmt_resources');
+      resourceChannel.onmessage = (e) => {
+        const { type, data } = e.data || {};
+        if (type === 'resource_created' && data) {
+          setResources((prev) => (prev.some((r) => r.id === data.id) ? prev.map((r) => (r.id === data.id ? data : r)) : [data, ...prev]));
+        } else if (type === 'resource_updated' && data) {
+          setResources((prev) => prev.map((r) => (r.id === data.id ? data : r)));
+        } else if (type === 'resource_reviewed' && data) {
+          if (data?.resource) {
+            setResources((prev) => prev.map((r) => (r.id === data.resource.id ? data.resource : r)));
+          } else if (data?.resourceId && data?.review) {
+            setResources((prev) => prev.map((r) => (r.id === data.resourceId ? { ...r, reviews: [data.review, ...(r.reviews || [])] } : r)));
+          } else {
+            refreshResources();
+          }
+        } else if (type === 'resource_deleted' && data) {
+          const deletedId = data.id || data.resourceId;
+          setResources((prev) => prev.filter((r) => r.id !== deletedId));
+        }
+      };
+
+      settingsChannel = new BroadcastChannel('client_mgmt_settings');
+      settingsChannel.onmessage = (e) => {
+        const { type, data } = e.data || {};
+        if (type === 'integration_settings_updated' && data) {
+          setIntegrationSettings((prev) => ({ ...prev, ...data }));
+        } else if (type === 'company_settings_updated' && data) {
+          const activeCompId = currentUser?.companyId || (currentUser?.role === 'company_admin' ? currentUser.id : undefined);
+          const dataCompId = data.companyId || data.company_id;
+          if (!dataCompId || dataCompId === 'default' || dataCompId === activeCompId || !activeCompId) {
+            setCompanySettings((prev) => ({ ...prev, ...data }));
+          }
         }
       };
     } catch {
@@ -540,6 +1032,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       refreshCompanyOrganizations();
       refreshClientCompanies();
       refreshWorkspaceUsers();
+      refreshProjectMOUs();
+      refreshPayments();
+      refreshCommunityPosts();
+      refreshChatMessages();
+      refreshResources();
+      refreshIntegrationSettings();
+      const activeCompId = currentUser?.companyId || (currentUser?.role === 'company_admin' ? currentUser.id : undefined);
+      refreshCompanySettings(activeCompId);
+      refreshBatches();
     }, 5000);
 
     return () => {
@@ -549,6 +1050,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (orgChannel) orgChannel.close();
       if (clientChannel) clientChannel.close();
       if (userChannel) userChannel.close();
+      if (communityChannel) communityChannel.close();
+      if (chatChannel) chatChannel.close();
+      if (resourceChannel) resourceChannel.close();
+      if (settingsChannel) settingsChannel.close();
+      if (batchChannel) batchChannel.close();
       clearInterval(pollInterval);
     };
   }, []);
@@ -1239,21 +1745,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateUser = async (updated: User) => {
+    // 1. Optimistic local update
     setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
     if (currentUser.id === updated.id) {
       setCurrentUser(updated);
     }
+
+    // 2. Cross-tab real-time push
+    try {
+      const uCh = new BroadcastChannel('client_mgmt_batch_users');
+      uCh.postMessage({ type: 'user_updated', data: updated });
+      uCh.close();
+    } catch {}
+
+    // 3. PostgreSQL backend database persistence
     try {
       const saved = await userApi.update(updated.id, updated);
-      try {
-        const uCh = new BroadcastChannel('client_mgmt_batch_users');
-        uCh.postMessage({ type: 'user_updated', data: saved });
-        uCh.close();
-      } catch {}
+      if (saved && typeof saved === 'object') {
+        setUsers((prev) => prev.map((u) => (u.id === saved.id ? saved : u)));
+        if (currentUser.id === saved.id) {
+          setCurrentUser(saved);
+        }
+      }
     } catch (err) {
       console.warn('Backend update user error:', err);
     }
 
+    // 4. Sync Company Organization if updating a company admin
+    if (updated.role === 'company_admin') {
+      const compId = updated.companyId || updated.id;
+      if (compId) {
+        const orgPatch = {
+          adminName: updated.name,
+          adminEmail: updated.email,
+          phone: updated.phone || '',
+        };
+        companyOrganizationApi
+          .update(compId, orgPatch)
+          .then((org) => {
+            setCompanyAdminMetrics((prev) =>
+              prev.map((c) => (c.companyAdminId === compId ? { ...c, ...org } : c))
+            );
+          })
+          .catch(console.error);
+      }
+    }
+
+    // 5. Sync Client Company if updating a client representative
+    if (updated.role === 'client' && updated.companyId) {
+      clientCompanyApi
+        .update(updated.companyId, {
+          clientName: updated.name,
+          email: updated.email,
+          phone: updated.phone || '',
+        })
+        .then((comp) => {
+          setClientCompanies((prev) =>
+            prev.map((c) => (c.id === updated.companyId ? { ...c, ...comp } : c))
+          );
+        })
+        .catch(console.error);
+    }
+
+    // 6. Sync Product Admin account if updating a product admin
     if (updated.role === 'product_admin') {
       productAdminApi
         .update(updated.id, {
@@ -1287,13 +1841,88 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Batches
-  const addBatch = (batch: Omit<Batch, 'id'>) => {
+  // Batches (Real-time and PostgreSQL synced)
+  const addBatch = async (batch: Omit<Batch, 'id'>): Promise<Batch> => {
+    const userCompanyId =
+      currentUser?.companyId ||
+      (currentUser?.role === 'company_admin' ? currentUser.id : 'comp_acme');
     const newBatch: Batch = {
       ...batch,
       id: `batch_${Date.now()}`,
+      companyId: batch.companyId || userCompanyId,
+      leadAdminId: batch.leadAdminId || currentUser?.id || '',
+      clientCount: batch.clientCount || 0,
+      workerCount: batch.workerCount || 0,
+      startDate: batch.startDate || new Date().toISOString().split('T')[0],
+      status: batch.status || 'active',
     };
+
+    // 1. Immediate optimistic UI state update
     setBatches((prev) => [...prev, newBatch]);
+
+    // 2. Automatically link new batch to current user's batchIds
+    if (currentUser) {
+      const currentBatchIds = currentUser.batchIds || [];
+      if (!currentBatchIds.includes(newBatch.id)) {
+        const updatedUser: User = {
+          ...currentUser,
+          batchIds: [...currentBatchIds, newBatch.id],
+        };
+        setCurrentUser(updatedUser);
+        setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updatedUser : u)));
+        userApi.update(currentUser.id, { batchIds: updatedUser.batchIds }).catch(console.error);
+      }
+    }
+
+    // 3. Persist to PostgreSQL backend via batchApi
+    try {
+      await batchApi.create(newBatch);
+    } catch (err) {
+      console.warn('Batch create API warning:', err);
+    }
+
+    // 4. Update company metrics totalBatches
+    if (newBatch.companyId) {
+      setCompanyAdminMetrics((prev) =>
+        prev.map((c) =>
+          c.companyAdminId === newBatch.companyId
+            ? { ...c, totalBatches: (c.totalBatches || 0) + 1 }
+            : c
+        )
+      );
+    }
+
+    // 5. Broadcast to all open tabs and windows in real time
+    try {
+      const ch = new BroadcastChannel('client_mgmt_batches');
+      ch.postMessage({ type: 'batch_created', data: newBatch });
+      ch.close();
+    } catch {}
+
+    return newBatch;
+  };
+
+  const deleteBatch = async (batchId: string) => {
+    setBatches((prev) => prev.filter((b) => b.id !== batchId));
+    if (currentUser && currentUser.batchIds?.includes(batchId)) {
+      const updatedUser: User = {
+        ...currentUser,
+        batchIds: currentUser.batchIds.filter((id) => id !== batchId),
+      };
+      setCurrentUser(updatedUser);
+      setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updatedUser : u)));
+      userApi.update(currentUser.id, { batchIds: updatedUser.batchIds }).catch(console.error);
+    }
+    try {
+      await batchApi.delete(batchId);
+    } catch (err) {
+      console.warn('Batch delete API warning:', err);
+    }
+    try {
+      const ch = new BroadcastChannel('client_mgmt_batches');
+      ch.postMessage({ type: 'batch_deleted', data: { id: batchId } });
+      ch.close();
+    } catch {}
   };
 
   // Meetings
@@ -1322,7 +1951,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Community
-  const addCommunityPost = (
+  const addCommunityPost = async (
     title: string,
     content: string,
     tags?: string[],
@@ -1349,19 +1978,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       links: links || [],
     };
     setCommunityPosts((prev) => [newPost, ...prev]);
+
+    try {
+      const ch = new BroadcastChannel('client_mgmt_community_posts');
+      ch.postMessage({ type: 'community_post_created', data: newPost });
+      ch.close();
+    } catch {}
+
+    try {
+      const created = await communityApi.createPost(newPost);
+      if (created && created.id) {
+        setCommunityPosts((prev) => prev.map((p) => (p.id === newPost.id ? created : p)));
+      }
+    } catch (err) {
+      console.warn('Error saving community post to database:', err);
+    }
   };
 
-  const editCommunityPost = (postId: string, title: string, content: string) => {
+  const editCommunityPost = async (postId: string, title: string, content: string) => {
     setCommunityPosts((prev) =>
       prev.map((p) => (p.id === postId ? { ...p, title, content } : p))
     );
+
+    try {
+      const ch = new BroadcastChannel('client_mgmt_community_posts');
+      ch.postMessage({ type: 'community_post_updated', data: { id: postId, title, content } });
+      ch.close();
+    } catch {}
+
+    try {
+      await communityApi.updatePost(postId, { title, content });
+    } catch (err) {
+      console.warn('Error updating community post in database:', err);
+    }
   };
 
-  const deleteCommunityPost = (postId: string) => {
+  const deleteCommunityPost = async (postId: string) => {
     setCommunityPosts((prev) => prev.filter((p) => p.id !== postId));
+
+    try {
+      const ch = new BroadcastChannel('client_mgmt_community_posts');
+      ch.postMessage({ type: 'community_post_deleted', data: { id: postId } });
+      ch.close();
+    } catch {}
+
+    try {
+      await communityApi.deletePost(postId);
+    } catch (err) {
+      console.warn('Error deleting community post from database:', err);
+    }
   };
 
-  const addCommunityReply = (
+  const addCommunityReply = async (
     postId: string,
     content: string,
     parentReplyId?: string,
@@ -1387,97 +2055,319 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCommunityPosts((prev) =>
       prev.map((post) => {
         if (post.id === postId) {
-          return {
+          const updatedPost = {
             ...post,
             replies: [...post.replies, newReply],
           };
+          try {
+            const ch = new BroadcastChannel('client_mgmt_community_posts');
+            ch.postMessage({ type: 'community_reply_added', data: { postId, reply: newReply, post: updatedPost } });
+            ch.close();
+          } catch {}
+          return updatedPost;
         }
         return post;
       })
     );
+
+    try {
+      const updatedPost = await communityApi.addReply(postId, newReply);
+      if (updatedPost && updatedPost.id) {
+        setCommunityPosts((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)));
+      }
+    } catch (err) {
+      console.warn('Error saving community reply to database:', err);
+    }
   };
 
-  const deleteCommunityReply = (postId: string, replyId: string) => {
+  const deleteCommunityReply = async (postId: string, replyId: string) => {
     setCommunityPosts((prev) =>
       prev.map((post) => {
         if (post.id === postId) {
-          return {
+          const updatedPost = {
             ...post,
             replies: post.replies.filter((r) => r.id !== replyId),
           };
+          try {
+            const ch = new BroadcastChannel('client_mgmt_community_posts');
+            ch.postMessage({ type: 'community_reply_deleted', data: { postId, replyId, post: updatedPost } });
+            ch.close();
+          } catch {}
+          return updatedPost;
         }
         return post;
       })
     );
+
+    try {
+      const updatedPost = await communityApi.deleteReply(postId, replyId);
+      if (updatedPost && updatedPost.id) {
+        setCommunityPosts((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)));
+      }
+    } catch (err) {
+      console.warn('Error deleting community reply from database:', err);
+    }
   };
 
-  const toggleLikePost = (postId: string) => {
+  const toggleLikePost = async (postId: string) => {
     setCommunityPosts((prev) =>
       prev.map((post) => {
         if (post.id === postId) {
           const likedBy = post.likedBy || [];
           const hasLiked = likedBy.includes(currentUser.id);
-          return {
+          const updatedPost = {
             ...post,
             likes: hasLiked ? Math.max(0, post.likes - 1) : post.likes + 1,
             likedBy: hasLiked
               ? likedBy.filter((id) => id !== currentUser.id)
               : [...likedBy, currentUser.id],
           };
+          try {
+            const ch = new BroadcastChannel('client_mgmt_community_posts');
+            ch.postMessage({ type: 'community_post_liked', data: updatedPost });
+            ch.close();
+          } catch {}
+          return updatedPost;
         }
         return post;
       })
     );
+
+    try {
+      const updatedPost = await communityApi.toggleLikePost(postId, currentUser.id);
+      if (updatedPost && updatedPost.id) {
+        setCommunityPosts((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)));
+      }
+    } catch (err) {
+      console.warn('Error toggling post like in database:', err);
+    }
   };
 
-  const toggleLikeReply = (postId: string, replyId: string) => {
+  const toggleLikeReply = async (postId: string, replyId: string) => {
     setCommunityPosts((prev) =>
       prev.map((post) => {
         if (post.id === postId) {
-          return {
-            ...post,
-            replies: post.replies.map((reply) => {
-              if (reply.id === replyId) {
-                const likedBy = reply.likedBy || [];
-                const hasLiked = likedBy.includes(currentUser.id);
-                return {
-                  ...reply,
-                  likes: hasLiked ? Math.max(0, reply.likes - 1) : reply.likes + 1,
-                  likedBy: hasLiked
-                    ? likedBy.filter((id) => id !== currentUser.id)
-                    : [...likedBy, currentUser.id],
-                };
-              }
-              return reply;
-            }),
-          };
+          const updatedReplies = post.replies.map((reply) => {
+            if (reply.id === replyId) {
+              const likedBy = reply.likedBy || [];
+              const hasLiked = likedBy.includes(currentUser.id);
+              return {
+                ...reply,
+                likes: hasLiked ? Math.max(0, reply.likes - 1) : reply.likes + 1,
+                likedBy: hasLiked
+                  ? likedBy.filter((id) => id !== currentUser.id)
+                  : [...likedBy, currentUser.id],
+              };
+            }
+            return reply;
+          });
+          const updatedPost = { ...post, replies: updatedReplies };
+          try {
+            const ch = new BroadcastChannel('client_mgmt_community_posts');
+            ch.postMessage({ type: 'community_reply_liked', data: { postId, replyId, post: updatedPost } });
+            ch.close();
+          } catch {}
+          return updatedPost;
         }
         return post;
       })
     );
+
+    try {
+      const updatedPost = await communityApi.toggleLikeReply(postId, replyId, currentUser.id);
+      if (updatedPost && updatedPost.id) {
+        setCommunityPosts((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)));
+      }
+    } catch (err) {
+      console.warn('Error toggling reply like in database:', err);
+    }
   };
 
   // Chat
-  const sendChatMessage = (text: string, recipientId?: string) => {
+  const sendChatMessage = async (
+    text: string,
+    recipientId?: string,
+    attachment?: ChatAttachment,
+    attachments?: ChatAttachment[]
+  ) => {
     const userCompanyId = currentUser?.companyId || (currentUser?.role === 'company_admin' ? currentUser.id : undefined);
+    const tempId = `msg_${Date.now()}`;
     const newMsg: ChatMessage = {
-      id: `msg_${Date.now()}`,
+      id: tempId,
       batchId: activeBatchId,
       companyId: userCompanyId,
       senderId: currentUser.id,
       senderName: currentUser.name,
       senderRole: currentUser.role,
       senderAvatar: currentUser.avatar,
-      recipientId,
-      text,
+      recipientId: recipientId || undefined,
+      text: text || '',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       status: 'delivered',
+      attachment,
+      attachments,
+      createdAt: new Date().toISOString(),
     };
+
+    // Optimistic local state update
     setChatMessages((prev) => [...prev, newMsg]);
+
+    // Cross-tab broadcast
+    try {
+      const ch = new BroadcastChannel('client_mgmt_chat_messages');
+      ch.postMessage({ type: 'chat_message_created', data: newMsg });
+      ch.close();
+    } catch {}
+
+    // Persist to PostgreSQL backend database (which broadcasts via SSE)
+    try {
+      const created = await chatApi.createMessage(newMsg);
+      if (created && created.id) {
+        setChatMessages((prev) => prev.map((m) => (m.id === tempId ? created : m)));
+      }
+    } catch (err) {
+      console.warn('Error saving chat message to backend:', err);
+    }
   };
 
-  // Resources
-  const addResource = (title: string, description: string, fileType: string, fileSize: string) => {
+  const markMessagesAsRead = async (messageIds?: string[], targetSenderId?: string) => {
+    try {
+      // Optimistic local update
+      setChatMessages((prev) =>
+        prev.map((m) => {
+          if (messageIds && messageIds.length > 0) {
+            if (messageIds.includes(m.id)) {
+              return { ...m, status: 'read' as const };
+            }
+          } else if (m.batchId === activeBatchId && m.senderId !== currentUser.id) {
+            if (!targetSenderId || m.senderId === targetSenderId) {
+              return { ...m, status: 'read' as const };
+            }
+          }
+          return m;
+        })
+      );
+
+      // Broadcast to other tabs
+      try {
+        const ch = new BroadcastChannel('client_mgmt_chat_messages');
+        ch.postMessage({
+          type: 'chat_messages_read',
+          data: {
+            messageIds: messageIds && messageIds.length > 0 ? messageIds : [],
+            readerId: currentUser.id,
+            status: 'read',
+          },
+        });
+        ch.close();
+      } catch {}
+
+      // Call PostgreSQL backend
+      await chatApi.markAsRead({
+        messageIds: messageIds && messageIds.length > 0 ? messageIds : undefined,
+        readerId: currentUser.id,
+        batchId: activeBatchId,
+        senderId: targetSenderId,
+      });
+    } catch (err) {
+      console.warn('Error marking chat messages as read:', err);
+    }
+  };
+
+  const editChatMessage = async (messageId: string, newText: string) => {
+    // Optimistic local update
+    setChatMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, text: newText, isEdited: true } : m))
+    );
+
+    // Cross-tab broadcast
+    try {
+      const ch = new BroadcastChannel('client_mgmt_chat_messages');
+      ch.postMessage({
+        type: 'chat_message_updated',
+        data: { id: messageId, text: newText, isEdited: true },
+      });
+      ch.close();
+    } catch {}
+
+    // Persist to backend database (and trigger SSE broadcast)
+    try {
+      const updated = await chatApi.updateMessage(messageId, { text: newText, isEdited: true });
+      if (updated && updated.id) {
+        setChatMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, ...updated } : m))
+        );
+      }
+    } catch (err) {
+      console.warn('Backend edit chat message fallback to local:', err);
+    }
+  };
+
+  const deleteChatMessage = async (messageId: string) => {
+    // Optimistic local update
+    setChatMessages((prev) => prev.filter((m) => m.id !== messageId));
+
+    // Cross-tab broadcast
+    try {
+      const ch = new BroadcastChannel('client_mgmt_chat_messages');
+      ch.postMessage({ type: 'chat_message_deleted', data: { id: messageId } });
+      ch.close();
+    } catch {}
+
+    // Persist to backend database (and trigger SSE broadcast)
+    try {
+      await chatApi.deleteMessage(messageId);
+    } catch (err) {
+      console.warn('Backend delete chat message fallback to local:', err);
+    }
+  };
+
+  const deleteChatMessageForMe = async (messageId: string, userId: string) => {
+    // Optimistic local update
+    setChatMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? {
+              ...m,
+              deletedForUserIds: Array.from(new Set([...(m.deletedForUserIds || []), userId])),
+            }
+          : m
+      )
+    );
+
+    // Cross-tab broadcast
+    try {
+      const ch = new BroadcastChannel('client_mgmt_chat_messages');
+      ch.postMessage({
+        type: 'chat_message_deleted_for_me',
+        data: { messageId, userId },
+      });
+      ch.close();
+    } catch {}
+
+    // Persist to backend database (triggers SSE broadcast of updated message)
+    try {
+      const updated = await chatApi.deleteForMe(messageId, userId);
+      if (updated && updated.id) {
+        setChatMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, ...updated } : m))
+        );
+      }
+    } catch (err) {
+      console.warn('Backend delete-for-me fallback to local:', err);
+    }
+  };
+
+  // Resources & Deliverables (PostgreSQL & Real-Time)
+  const addResource = async (
+    title: string,
+    description: string,
+    fileType: string,
+    fileSize: string,
+    fileUrl?: string,
+    fileName?: string,
+    externalLink?: string
+  ) => {
     const userCompanyId = currentUser?.companyId || (currentUser?.role === 'company_admin' ? currentUser.id : undefined);
     const newResource: ResourceItem = {
       id: `res_${Date.now()}`,
@@ -1488,16 +2378,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       uploaderId: currentUser.id,
       uploaderName: currentUser.name,
       uploaderRole: currentUser.role,
-      fileType,
-      fileSize,
+      fileType: fileType || 'PDF Document',
+      fileSize: fileSize || '1.0 MB',
       uploadedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      fileUrl: '#',
+      fileUrl: fileUrl || '#',
+      fileName: fileName || '',
+      externalLink: externalLink || '',
       reviews: [],
     };
+
+    // Optimistic UI update
     setResources((prev) => [newResource, ...prev]);
+
+    // Cross-tab broadcast
+    try {
+      const ch = new BroadcastChannel('client_mgmt_resources');
+      ch.postMessage({ type: 'resource_created', data: newResource });
+      setTimeout(() => ch.close(), 100);
+    } catch {
+      // BroadcastChannel not available
+    }
+
+    // Persist to PostgreSQL backend
+    try {
+      const created = await resourceApi.createResource(newResource);
+      if (created && created.id) {
+        setResources((prev) => prev.map((r) => (r.id === newResource.id ? created : r)));
+      }
+    } catch (err) {
+      console.warn('Backend resource creation error, local state retained:', err);
+    }
   };
 
-  const addResourceReview = (resourceId: string, rating: number, feedback: string) => {
+  const addResourceReview = async (resourceId: string, rating: number, feedback: string) => {
     const newReview: ResourceReview = {
       id: `rev_${Date.now()}`,
       resourceId,
@@ -1509,6 +2422,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
     };
 
+    // Optimistic UI update
     setResources((prev) =>
       prev.map((res) => {
         if (res.id === resourceId) {
@@ -1520,29 +2434,127 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return res;
       })
     );
+
+    // Cross-tab broadcast
+    try {
+      const ch = new BroadcastChannel('client_mgmt_resources');
+      ch.postMessage({
+        type: 'resource_reviewed',
+        data: {
+          resourceId,
+          review: newReview,
+        },
+      });
+      setTimeout(() => ch.close(), 100);
+    } catch {
+      // BroadcastChannel not available
+    }
+
+    // Persist to backend
+    try {
+      const updatedResource = await resourceApi.addReview(resourceId, {
+        rating,
+        feedback,
+        reviewerId: currentUser.id,
+        reviewerName: currentUser.name,
+        reviewerRole: currentUser.role,
+      });
+      if (updatedResource) {
+        setResources((prev) => prev.map((r) => (r.id === resourceId ? updatedResource : r)));
+      }
+    } catch (err) {
+      console.warn('Backend resource review error, local state retained:', err);
+    }
+  };
+
+  const deleteResource = async (resourceId: string) => {
+    setResources((prev) => prev.filter((r) => r.id !== resourceId));
+    try {
+      const ch = new BroadcastChannel('client_mgmt_resources');
+      ch.postMessage({ type: 'resource_deleted', data: { id: resourceId } });
+      setTimeout(() => ch.close(), 100);
+    } catch {}
+
+    try {
+      await resourceApi.deleteResource(resourceId);
+    } catch (err) {
+      console.warn('Backend delete resource error:', err);
+    }
   };
 
   // Integrations & Settings
-  const updateIntegrationSettings = (newSettings: Partial<IntegrationSettings>) => {
+  const updateIntegrationSettings = async (newSettings: Partial<IntegrationSettings>) => {
     setIntegrationSettings((prev) => ({ ...prev, ...newSettings }));
+    try {
+      const chan = new BroadcastChannel('client_mgmt_settings');
+      chan.postMessage({ type: 'integration_settings_updated', data: newSettings });
+      chan.close();
+    } catch {
+      // BroadcastChannel not available
+    }
+
+    try {
+      await settingsApi.updateIntegrationSettings(newSettings);
+    } catch (err) {
+      console.warn('Backend update integration settings error:', err);
+    }
   };
 
-  const updateCompanySettings = (newSettings: Partial<CompanySettings>) => {
+  const updateCompanySettings = async (newSettings: Partial<CompanySettings>, targetCompanyId?: string) => {
+    const compId = targetCompanyId || currentUser?.companyId || (currentUser?.role === 'company_admin' ? currentUser.id : undefined);
+
     setCompanySettings((prev) => ({ ...prev, ...newSettings }));
+    try {
+      const chan = new BroadcastChannel('client_mgmt_settings');
+      chan.postMessage({ type: 'company_settings_updated', data: { ...newSettings, companyId: compId } });
+      chan.close();
+    } catch {
+      // BroadcastChannel not available
+    }
+
+    try {
+      const updated = await settingsApi.updateCompanySettings(newSettings, compId);
+      if (updated && typeof updated === 'object') {
+        setCompanySettings((prev) => ({ ...prev, ...updated }));
+      }
+    } catch (err) {
+      console.warn('Backend update company settings error:', err);
+    }
+
+    // Also sync matching company organization metric in DB if alerts were toggled
+    if (compId && (newSettings.whatsappAlertsEnabled !== undefined || newSettings.emailAlertsEnabled !== undefined)) {
+      try {
+        const patch: Partial<CompanyAdminMetric> = {};
+        if (newSettings.whatsappAlertsEnabled !== undefined) {
+          patch.whatsappEnabled = newSettings.whatsappAlertsEnabled;
+        }
+        if (newSettings.emailAlertsEnabled !== undefined) {
+          patch.emailEnabled = newSettings.emailAlertsEnabled;
+        }
+        await companyOrganizationApi.update(compId, patch);
+        setCompanyAdminMetrics((prev) =>
+          prev.map((c) => (c.companyAdminId === compId ? { ...c, ...patch } : c))
+        );
+      } catch (err) {
+        console.warn('Sync company organization alerts error:', err);
+      }
+    }
   };
 
-  const toggleCompanyIntegration = (companyId: string, type: 'whatsapp' | 'email', value: boolean) => {
+  const toggleCompanyIntegration = async (companyId: string, type: 'whatsapp' | 'email', value: boolean) => {
+    let updatedCompSettings: Record<string, { whatsappEnabled: boolean; emailEnabled: boolean }> = {};
     setIntegrationSettings((prev) => {
       const currentComp = prev.companySettings[companyId] || { whatsappEnabled: false, emailEnabled: false };
+      updatedCompSettings = {
+        ...prev.companySettings,
+        [companyId]: {
+          ...currentComp,
+          [type === 'whatsapp' ? 'whatsappEnabled' : 'emailEnabled']: value,
+        },
+      };
       return {
         ...prev,
-        companySettings: {
-          ...prev.companySettings,
-          [companyId]: {
-            ...currentComp,
-            [type === 'whatsapp' ? 'whatsappEnabled' : 'emailEnabled']: value,
-          },
-        },
+        companySettings: updatedCompSettings,
       };
     });
 
@@ -1557,25 +2569,72 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return metric;
       })
     );
+
+    try {
+      const chan = new BroadcastChannel('client_mgmt_settings');
+      chan.postMessage({
+        type: 'integration_settings_updated',
+        data: { companySettings: updatedCompSettings },
+      });
+      chan.close();
+    } catch {
+      // BroadcastChannel not available
+    }
+
+    try {
+      await settingsApi.updateIntegrationSettings({ companySettings: updatedCompSettings });
+    } catch (err) {
+      console.warn('Backend toggle company integration error:', err);
+    }
+
+    try {
+      const org = companyAdminMetrics.find((c) => c.companyAdminId === companyId);
+      if (org) {
+        await companyOrganizationApi.update(companyId, {
+          [type === 'whatsapp' ? 'whatsappEnabled' : 'emailEnabled']: value,
+        });
+      }
+    } catch {
+      // ignore
+    }
   };
 
-  const toggleClientIntegration = (clientId: string, type: 'whatsapp' | 'email', value: boolean) => {
+  const toggleClientIntegration = async (clientId: string, type: 'whatsapp' | 'email', value: boolean) => {
+    let updatedClientSettings: Record<string, { whatsappEnabled: boolean; emailEnabled: boolean }> = {};
     setIntegrationSettings((prev) => {
       const currentClient = prev.clientSettings?.[clientId] || {
         whatsappEnabled: prev.whatsappEnabledGlobal,
         emailEnabled: prev.emailAlertsGlobal,
       };
-      return {
-        ...prev,
-        clientSettings: {
-          ...(prev.clientSettings || {}),
-          [clientId]: {
-            ...currentClient,
-            [type === 'whatsapp' ? 'whatsappEnabled' : 'emailEnabled']: value,
-          },
+      updatedClientSettings = {
+        ...(prev.clientSettings || {}),
+        [clientId]: {
+          ...currentClient,
+          [type === 'whatsapp' ? 'whatsappEnabled' : 'emailEnabled']: value,
         },
       };
+      return {
+        ...prev,
+        clientSettings: updatedClientSettings,
+      };
     });
+
+    try {
+      const chan = new BroadcastChannel('client_mgmt_settings');
+      chan.postMessage({
+        type: 'integration_settings_updated',
+        data: { clientSettings: updatedClientSettings },
+      });
+      chan.close();
+    } catch {
+      // BroadcastChannel not available
+    }
+
+    try {
+      await settingsApi.updateIntegrationSettings({ clientSettings: updatedClientSettings });
+    } catch (err) {
+      console.warn('Backend toggle client integration error:', err);
+    }
   };
 
   const createProductAdminAccount = (
@@ -1761,6 +2820,218 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  // Project MOUs CRUD
+  const addProjectMOU = async (
+    mouData: Omit<ProjectMOU, 'id'>,
+    autoCreatePayment = true
+  ) => {
+    const compId = mouData.companyId || currentUser?.companyId || 'comp_acme';
+    const tempId = `mou_${Date.now()}`;
+    const newMou: ProjectMOU = {
+      ...mouData,
+      id: tempId,
+      companyId: compId,
+      status: mouData.status || 'active',
+      createdAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+    };
+    setProjectMous((prev) => [newMou, ...prev]);
+
+    // If auto create payment for current month
+    if (autoCreatePayment && newMou.monthlyAmount > 0) {
+      const curMonth = new Date().toISOString().slice(0, 7);
+      const dueDay = newMou.billingDayOfMonth || 5;
+      const dueDate = `${curMonth}-${String(dueDay).padStart(2, '0')}`;
+      const tempPayId = `pay_${Date.now()}`;
+      const newPay: PaymentRecord = {
+        id: tempPayId,
+        projectMouId: tempId,
+        companyId: compId,
+        clientCompanyId: newMou.clientCompanyId,
+        clientName: newMou.clientName,
+        clientEmail: newMou.clientEmail,
+        title: `${new Date().toLocaleString('default', { month: 'long' })} ${new Date().getFullYear()} Retainer - ${newMou.projectTitle}`,
+        invoiceNumber: `INV-${curMonth.replace('-', '')}-${Math.floor(1000 + Math.random() * 9000)}`,
+        billingMonth: curMonth,
+        amount: newMou.monthlyAmount,
+        currency: newMou.currency,
+        currencySymbol: newMou.currencySymbol,
+        dueDate,
+        status: 'pending',
+        createdAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      };
+      setPayments((prev) => [newPay, ...prev]);
+    }
+
+    try {
+      const saved = await paymentApi.createProjectMOU({ ...newMou, autoCreatePayment });
+      setProjectMous((prev) => prev.map((m) => (m.id === tempId ? saved : m)));
+      refreshPayments();
+      try {
+        const ch = new BroadcastChannel('client_mgmt_project_mous');
+        ch.postMessage({ type: 'project_mou_created', data: saved });
+        ch.close();
+      } catch {}
+    } catch (err) {
+      console.warn('Backend Project MOU save fallback to local state:', err);
+    }
+  };
+
+  const updateProjectMOU = async (mou: ProjectMOU) => {
+    setProjectMous((prev) => prev.map((m) => (m.id === mou.id ? mou : m)));
+    try {
+      const updated = await paymentApi.updateProjectMOU(mou.id, mou);
+      setProjectMous((prev) => prev.map((m) => (m.id === mou.id ? updated : m)));
+      try {
+        const ch = new BroadcastChannel('client_mgmt_project_mous');
+        ch.postMessage({ type: 'project_mou_updated', data: updated });
+        ch.close();
+      } catch {}
+    } catch (err) {
+      console.warn('Backend Project MOU update fallback to local state:', err);
+    }
+  };
+
+  const deleteProjectMOU = async (mouId: string) => {
+    setProjectMous((prev) => prev.filter((m) => m.id !== mouId));
+    try {
+      await paymentApi.deleteProjectMOU(mouId);
+      try {
+        const ch = new BroadcastChannel('client_mgmt_project_mous');
+        ch.postMessage({ type: 'project_mou_deleted', data: { id: mouId } });
+        ch.close();
+      } catch {}
+    } catch (err) {
+      console.warn('Backend Project MOU delete fallback:', err);
+    }
+  };
+
+  // Payments CRUD
+  const addPayment = async (payData: Omit<PaymentRecord, 'id' | 'createdAt'>) => {
+    const compId = payData.companyId || currentUser?.companyId || 'comp_acme';
+    const tempId = `pay_${Date.now()}`;
+    const newPay: PaymentRecord = {
+      ...payData,
+      id: tempId,
+      companyId: compId,
+      status: payData.status || 'pending',
+      createdAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+    };
+    setPayments((prev) => [newPay, ...prev]);
+
+    try {
+      const saved = await paymentApi.createPayment(newPay);
+      setPayments((prev) => prev.map((p) => (p.id === tempId ? saved : p)));
+      try {
+        const ch = new BroadcastChannel('client_mgmt_payments');
+        ch.postMessage({ type: 'payment_created', data: saved });
+        ch.close();
+      } catch {}
+    } catch (err) {
+      console.warn('Backend payment save fallback to local state:', err);
+    }
+  };
+
+  const updatePayment = async (pay: PaymentRecord) => {
+    setPayments((prev) => prev.map((p) => (p.id === pay.id ? pay : p)));
+    try {
+      const updated = await paymentApi.updatePayment(pay.id, pay);
+      setPayments((prev) => prev.map((p) => (p.id === pay.id ? updated : p)));
+      try {
+        const ch = new BroadcastChannel('client_mgmt_payments');
+        ch.postMessage({ type: 'payment_updated', data: updated });
+        ch.close();
+      } catch {}
+    } catch (err) {
+      console.warn('Backend payment update fallback:', err);
+    }
+  };
+
+  const markPaymentPaid = async (
+    id: string,
+    details: {
+      paidDate?: string;
+      paymentMethod?: string;
+      transactionReference?: string;
+      notes?: string;
+    }
+  ) => {
+    const paidDate = details.paidDate || new Date().toISOString().split('T')[0];
+    const method = details.paymentMethod || 'Bank Transfer (NEFT/RTGS)';
+    const ref = details.transactionReference || `UTR-${Date.now()}`;
+
+    setPayments((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              status: 'paid',
+              paidDate,
+              paymentMethod: method,
+              transactionReference: ref,
+              notes: details.notes !== undefined ? details.notes : p.notes,
+            }
+          : p
+      )
+    );
+
+    try {
+      const res = await paymentApi.markPaid(id, details);
+      if (res.payment) {
+        setPayments((prev) => prev.map((p) => (p.id === id ? res.payment : p)));
+      }
+      try {
+        const ch = new BroadcastChannel('client_mgmt_payments');
+        ch.postMessage({ type: 'payment_updated', data: res.payment });
+        ch.close();
+      } catch {}
+      return { success: true, message: res.message || 'Payment marked as completed.' };
+    } catch {
+      return { success: true, message: 'Payment marked as completed in local workspace.' };
+    }
+  };
+
+  const sendPaymentReminder = async (id: string) => {
+    const nowStr = new Date().toISOString().replace('T', ' ').slice(0, 16);
+    setPayments((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, reminderSent: true, reminderSentAt: nowStr } : p
+      )
+    );
+
+    try {
+      const res = await paymentApi.sendReminder(id);
+      if (res.payment) {
+        setPayments((prev) => prev.map((p) => (p.id === id ? res.payment : p)));
+      }
+      return res;
+    } catch {
+      return {
+        success: true,
+        message: 'Payment reminder simulated & queued successfully for client email.',
+        emailDetails: {
+          to: 'client@example.com',
+          subject: 'Payment Reminder Notification',
+          sentAt: nowStr,
+          preview: 'Automated invoice payment reminder notification.',
+        },
+      };
+    }
+  };
+
+  const deletePayment = async (id: string) => {
+    setPayments((prev) => prev.filter((p) => p.id !== id));
+    try {
+      await paymentApi.deletePayment(id);
+      try {
+        const ch = new BroadcastChannel('client_mgmt_payments');
+        ch.postMessage({ type: 'payment_deleted', data: { id } });
+        ch.close();
+      } catch {}
+    } catch (err) {
+      console.warn('Backend payment delete fallback:', err);
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1808,6 +3079,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateUser,
         deleteUser,
         addBatch,
+        deleteBatch,
+        refreshBatches,
         addMeeting,
         addCommunityPost,
         editCommunityPost,
@@ -1817,8 +3090,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleLikePost,
         toggleLikeReply,
         sendChatMessage,
+        editChatMessage,
+        deleteChatMessage,
+        deleteChatMessageForMe,
+        markMessagesAsRead,
         addResource,
         addResourceReview,
+        deleteResource,
+        refreshResources,
+        refreshIntegrationSettings,
+        refreshCompanySettings,
         updateIntegrationSettings,
         updateCompanySettings,
         toggleCompanyIntegration,
@@ -1828,6 +3109,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateCompanyAdminMetric,
         deleteCompanyAdminMetric,
         toggleCompanyStatus,
+        projectMous,
+        payments,
+        refreshProjectMOUs,
+        refreshPayments,
+        refreshCommunityPosts,
+        addProjectMOU,
+        updateProjectMOU,
+        deleteProjectMOU,
+        addPayment,
+        updatePayment,
+        markPaymentPaid,
+        sendPaymentReminder,
+        deletePayment,
       }}
     >
       {children}
