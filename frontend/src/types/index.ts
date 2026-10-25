@@ -90,12 +90,21 @@ export interface Meeting {
   companyId?: string;
   title: string;
   description: string;
-  scheduleType: 'daily' | 'weekly' | 'custom';
+  scheduleType: 'daily' | 'weekly' | 'monthly' | 'custom';
   dateTime: string;
   durationMinutes: number;
   meetingUrl: string;
-  status: 'upcoming' | 'completed' | 'cancelled';
+  status: 'upcoming' | 'in_progress' | 'completed' | 'cancelled';
   hostName: string;
+  hostId?: string;
+  platform?: 'in_app' | 'google_meet' | 'zoom' | 'custom';
+  startDate?: string;
+  endDate?: string;
+  startTime?: string;
+  recurringPattern?: 'none' | 'daily' | 'weekly' | 'monthly';
+  recurringDays?: string[];
+  repeatMonths?: number;
+  seriesId?: string;
   aiSummary?: {
     overview: string;
     keyPoints: string[];
@@ -106,20 +115,25 @@ export interface Meeting {
     timestamp: string;
     text: string;
   }[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface AttendanceRecord {
   id: string;
   meetingId: string;
   batchId: string;
+  companyId?: string;
   date: string;
   userId: string;
   userName: string;
-  userRole: 'client' | 'work_user';
+  userRole: 'client' | 'work_user' | 'company_admin';
   status: 'present' | 'absent';
   minutesPresent: number;
   totalMeetingMinutes: number;
   notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PostAttachment {

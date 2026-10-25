@@ -208,10 +208,15 @@ Generated on: ${new Date().toISOString()}
           </div>
 
           {/* Table Breakdown of Call History */}
-          <div>
-            <h5 className="font-bold text-slate-900 text-sm mb-3">
-              Detailed Session Attendance Log
-            </h5>
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h5 className="font-bold text-slate-900 text-sm">
+                Detailed Session Attendance Log
+              </h5>
+              <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                Rule: &gt; 50% Duration Required for Present
+              </span>
+            </div>
             <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">

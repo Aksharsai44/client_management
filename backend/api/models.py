@@ -505,3 +505,104 @@ class WorkspaceBatch(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.code}) - {self.company_id}"
+
+
+class Meeting(models.Model):
+    STATUS_CHOICES = [
+        ('upcoming', 'Upcoming'),
+        ('in_progress', 'In Progress / Live'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    SCHEDULE_CHOICES = [
+        ('daily', 'Daily Standup'),
+        ('weekly', 'Weekly Sync'),
+        ('custom', 'Custom Date'),
+    ]
+
+    id = models.CharField(max_length=100, primary_key=True)
+    batch_id = models.CharField(max_length=100, db_index=True)
+    company_id = models.CharField(max_length=100, blank=True, default='', db_index=True)
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default='')
+    schedule_type = models.CharField(max_length=50, choices=SCHEDULE_CHOICES, default='weekly')
+    date_time = models.CharField(max_length=100, blank=True, default='')
+    duration_minutes = models.IntegerField(default=45)
+    meeting_url = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='upcoming')
+    host_name = models.CharField(max_length=255, blank=True, default='Admin')
+    host_id = models.CharField(max_length=100, blank=True, default='')
+    platform = models.CharField(max_length=50, blank=True, default='in_app')
+    start_date = models.CharField(max_length=50, blank=True, default='')
+    end_date = models.CharField(max_length=50, blank=True, default='')
+    start_time = models.CharField(max_length=20, blank=True, default='')
+    recurring_pattern = models.CharField(max_length=50, blank=True, default='none')
+    recurring_days = models.JSONField(default=list, blank=True)
+    repeat_months = models.IntegerField(default=1)
+    series_id = models.CharField(max_length=100, blank=True, default='', db_index=True)
+    ai_summary = models.JSONField(default=dict, blank=True)
+    transcript = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['date_time', '-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.id = f"meet_{int(time.time() * 1000)}"
+        if not self.date_time:
+            self.date_time = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M')
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.title} ({self.schedule_type}) - {self.batch_id} [{self.status}]"
+
+
+class AttendanceRecord(models.Model):
+    STATUS_CHOICES = [
+        ('present', 'Present'),
+        ('absent', 'Absent'),
+    ]
+    ROLE_CHOICES = [
+        ('client', 'Client'),
+        ('work_user', 'Work User'),
+        ('company_admin', 'Company Admin'),
+    ]
+
+    id = models.CharField(max_length=100, primary_key=True)
+    meeting_id = models.CharField(max_length=100, db_index=True)
+    batch_id = models.CharField(max_length=100, db_index=True)
+    company_id = models.CharField(max_length=100, blank=True, default='', db_index=True)
+    date = models.CharField(max_length=50, blank=True, default='')
+    user_id = models.CharField(max_length=100, db_index=True)
+    user_name = models.CharField(max_length=255)
+    user_role = models.CharField(max_length=50, choices=ROLE_CHOICES, default='client')
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='present')
+    minutes_present = models.IntegerField(default=0)
+    total_meeting_minutes = models.IntegerField(default=45)
+    notes = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date', '-created_at']
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.id = f"att_{int(time.time() * 1000)}"
+        if not self.date:
+            self.date = datetime.date.today().strftime('%Y-%m-%d')
+        # Rule: User must be present for at least half (> 50%) of the scheduled meeting duration
+        total = self.total_meeting_minutes or 45
+        threshold = total / 2.0
+        if self.minutes_present >= threshold and self.minutes_present > 0:
+            self.status = 'present'
+        else:
+            self.status = 'absent'
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.user_name} ({self.user_role}) - {self.meeting_id} [{self.status}: {self.minutes_present}/{self.total_meeting_minutes}m]"
+
+

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Meeting, User } from '../../types';
 import { Sparkles, CheckCircle2, Cpu } from 'lucide-react';
+import { meetingApi } from '../../services/meetingApi';
 
 interface WorkAiTranscriptsTabProps {
   batchMeetings: Meeting[];
@@ -28,7 +29,7 @@ export const WorkAiTranscriptsTab: React.FC<WorkAiTranscriptsTabProps> = ({
     },
   ]);
 
-  const handleWorkAiAsk = (e: React.FormEvent) => {
+  const handleWorkAiAsk = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workAiQuery.trim() || !selectedMeeting) return;
 
@@ -36,13 +37,21 @@ export const WorkAiTranscriptsTab: React.FC<WorkAiTranscriptsTabProps> = ({
     setWorkAiChat((prev) => [...prev, { sender: 'worker', text: q }]);
     setWorkAiQuery('');
 
-    setTimeout(() => {
-      let resp = `Regarding your query on "${selectedMeeting.title}": ${selectedMeeting.aiSummary?.overview || 'Sprint deliverables confirmed.'}`;
-      if (q.toLowerCase().includes('action') || q.toLowerCase().includes('task')) {
-        resp = `Assigned tasks: ${selectedMeeting.aiSummary?.actionItems?.join('; ') || 'Continue backlog development.'}`;
+    try {
+      const res = await meetingApi.askAiQuestion(selectedMeeting.id, q);
+      if (res && res.answer) {
+        setWorkAiChat((prev) => [...prev, { sender: 'ai', text: res.answer }]);
+        return;
       }
-      setWorkAiChat((prev) => [...prev, { sender: 'ai', text: resp }]);
-    }, 600);
+    } catch {
+      // Fallback
+    }
+
+    let resp = `Regarding your query on "${selectedMeeting.title}": ${selectedMeeting.aiSummary?.overview || 'Sprint deliverables confirmed.'}`;
+    if (q.toLowerCase().includes('action') || q.toLowerCase().includes('task')) {
+      resp = `Assigned tasks: ${selectedMeeting.aiSummary?.actionItems?.join('; ') || 'Continue backlog development.'}`;
+    }
+    setWorkAiChat((prev) => [...prev, { sender: 'ai', text: resp }]);
   };
 
   if (!selectedMeeting) {

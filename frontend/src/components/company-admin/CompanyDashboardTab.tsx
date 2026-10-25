@@ -1,6 +1,7 @@
 import React from 'react';
 import { User, Meeting, ResourceItem, AttendanceRecord } from '../../types';
-import { Building, Users, Video, FileText, Clock, CalendarDays } from 'lucide-react';
+import { Building, Users, Video, FileText, Clock, CalendarDays, PhoneCall } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
 
 interface CompanyDashboardTabProps {
   batchUsers: User[];
@@ -23,8 +24,10 @@ export const CompanyDashboardTab: React.FC<CompanyDashboardTabProps> = ({
   setSelectedCalendarDate,
   setActiveTab,
 }) => {
+  const { startCall, setActiveLiveCall } = useApp();
+  const inProgressMeeting = batchMeetings.find((m) => m.status === 'in_progress');
   const upcomingMeetings = batchMeetings.filter((m) => m.status === 'upcoming');
-  const nextMeeting = upcomingMeetings[0];
+  const nextMeeting = inProgressMeeting || upcomingMeetings[0];
 
   return (
     <div className="space-y-6">
@@ -95,11 +98,21 @@ export const CompanyDashboardTab: React.FC<CompanyDashboardTabProps> = ({
           </div>
 
           {nextMeeting ? (
-            <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+              nextMeeting.status === 'in_progress'
+                ? 'bg-red-50/70 border-red-300'
+                : 'bg-blue-50/60 border-blue-200'
+            }`}>
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
-                  {nextMeeting.scheduleType} sync
-                </span>
+                <div className="flex items-center space-x-2">
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                    nextMeeting.status === 'in_progress'
+                      ? 'text-red-700 bg-red-100 animate-pulse'
+                      : 'text-blue-700 bg-blue-100'
+                  }`}>
+                    {nextMeeting.status === 'in_progress' ? '● LIVE CALL IN PROGRESS' : `${nextMeeting.scheduleType} sync`}
+                  </span>
+                </div>
                 <h4 className="text-base font-bold text-slate-900 mt-1">
                   {nextMeeting.title}
                 </h4>
@@ -113,15 +126,25 @@ export const CompanyDashboardTab: React.FC<CompanyDashboardTabProps> = ({
                 </div>
               </div>
 
-              <a
-                href={nextMeeting.meetingUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center space-x-2 shadow-sm shrink-0 transition-transform hover:scale-102"
-              >
-                <Video className="w-4 h-4" />
-                <span>Join Call Now</span>
-              </a>
+              <div className="flex items-center space-x-2 shrink-0">
+                {nextMeeting.status === 'in_progress' ? (
+                  <button
+                    onClick={() => setActiveLiveCall(nextMeeting)}
+                    className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center space-x-2 shadow-sm transition-transform hover:scale-102"
+                  >
+                    <PhoneCall className="w-4 h-4" />
+                    <span>Join Live Call Now</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => startCall(nextMeeting.id)}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center space-x-2 shadow-sm transition-transform hover:scale-102"
+                  >
+                    <Video className="w-4 h-4" />
+                    <span>Start Call Now</span>
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <div className="p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-xl">

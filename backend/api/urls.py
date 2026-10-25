@@ -63,4 +63,18 @@ urlpatterns = [
     path('batches/', views.batches_list_create, name='batches_list_create'),
     path('batches/seed/', views.seed_initial_batches, name='seed_initial_batches'),
     path('batches/<str:pk>/', views.batch_detail, name='batch_detail'),
+    # Meetings & Real-time Call Scheduling Endpoints
+    path('meetings/', views.meetings_list_create, name='meetings_list_create'),
+    path('meetings/seed/', views.seed_initial_meetings, name='seed_initial_meetings'),
+    path('meetings/instant-call/', views.meeting_instant_call, name='meeting_instant_call'),
+    path('meetings/<str:pk>/', views.meeting_detail, name='meeting_detail'),
+    path('meetings/<str:pk>/start-call/', views.meeting_start_call, name='meeting_start_call'),
+    path('meetings/<str:pk>/end-call/', views.meeting_end_call, name='meeting_end_call'),
+    path('meetings/<str:pk>/analyze/', views.meeting_ai_analyze, name='meeting_ai_analyze'),
+    path('meetings/<str:pk>/ai-chat/', views.meeting_ai_chat, name='meeting_ai_chat'),
+    # Attendance Tracking Endpoints
+    path('attendance/', views.attendance_list_create, name='attendance_list_create'),
+    path('attendance/bulk/', views.attendance_bulk_mark, name='attendance_bulk_mark'),
+    path('attendance/<str:pk>/', views.attendance_detail, name='attendance_detail'),
 ]
+

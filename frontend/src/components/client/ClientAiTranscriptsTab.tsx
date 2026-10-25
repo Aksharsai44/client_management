@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Meeting, User } from '../../types';
 import { Sparkles, CheckCircle2, Cpu } from 'lucide-react';
+import { meetingApi } from '../../services/meetingApi';
 
 interface ClientAiTranscriptsTabProps {
   batchMeetings: Meeting[];
@@ -28,7 +29,7 @@ export const ClientAiTranscriptsTab: React.FC<ClientAiTranscriptsTabProps> = ({
     },
   ]);
 
-  const handleClientAiAsk = (e: React.FormEvent) => {
+  const handleClientAiAsk = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientAiQuery.trim() || !selectedMeeting) return;
 
@@ -36,18 +37,26 @@ export const ClientAiTranscriptsTab: React.FC<ClientAiTranscriptsTabProps> = ({
     setClientAiChat((prev) => [...prev, { sender: 'client', text: q }]);
     setClientAiQuery('');
 
-    setTimeout(() => {
-      let resp = `Regarding your inquiry on "${selectedMeeting.title}": ${
-        selectedMeeting.aiSummary?.overview ||
-        'The project deliverables remain fully on schedule.'
-      }`;
-      if (q.toLowerCase().includes('action') || q.toLowerCase().includes('task')) {
-        resp = `Here are the agreed actions: ${
-          selectedMeeting.aiSummary?.actionItems?.join('; ') || 'Standard progression.'
-        }`;
+    try {
+      const res = await meetingApi.askAiQuestion(selectedMeeting.id, q);
+      if (res && res.answer) {
+        setClientAiChat((prev) => [...prev, { sender: 'ai', text: res.answer }]);
+        return;
       }
-      setClientAiChat((prev) => [...prev, { sender: 'ai', text: resp }]);
-    }, 600);
+    } catch {
+      // Fallback
+    }
+
+    let resp = `Regarding your inquiry on "${selectedMeeting.title}": ${
+      selectedMeeting.aiSummary?.overview ||
+      'The project deliverables remain fully on schedule.'
+    }`;
+    if (q.toLowerCase().includes('action') || q.toLowerCase().includes('task')) {
+      resp = `Here are the agreed actions: ${
+        selectedMeeting.aiSummary?.actionItems?.join('; ') || 'Standard progression.'
+      }`;
+    }
+    setClientAiChat((prev) => [...prev, { sender: 'ai', text: resp }]);
   };
 
   if (!selectedMeeting) {

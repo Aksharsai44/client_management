@@ -8,9 +8,10 @@ import { ProductAdminView } from './components/product-admin/ProductAdminView';
 import { CompanyAdminView } from './components/company-admin/CompanyAdminView';
 import { ClientView } from './components/client/ClientView';
 import { WorkUserView } from './components/work-user/WorkUserView';
+import { LiveMeetingModal } from './components/common/LiveMeetingModal';
 
 const MainAppContent: React.FC = () => {
-  const { currentView, currentUser, activeTab } = useApp();
+  const { currentView, currentUser, activeTab, activeLiveCall, setActiveLiveCall } = useApp();
 
   const renderRoleModule = () => {
     if (!currentUser) return <CompanyAdminView />;
@@ -36,6 +37,13 @@ const MainAppContent: React.FC = () => {
         currentView === 'app' ? 'h-screen overflow-hidden' : 'min-h-screen'
       }`}
     >
+      {/* Live Video / Audio Meeting Call Room */}
+      {activeLiveCall && (
+        <LiveMeetingModal
+          meeting={activeLiveCall}
+          onClose={() => setActiveLiveCall(null)}
+        />
+      )}
 
       {currentView === 'brochure' ? (
         <BrochurePage />

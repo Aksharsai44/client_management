@@ -23,6 +23,7 @@ import { EditUserModal } from './modals/EditUserModal';
 import { ScheduleMeetingModal } from './modals/ScheduleMeetingModal';
 import { CompanyResourceModal } from './modals/CompanyResourceModal';
 import { AddBatchModal } from './modals/AddBatchModal';
+import { meetingApi } from '../../services/meetingApi';
 
 export const CompanyAdminView: React.FC = () => {
   const {
@@ -241,7 +242,7 @@ export const CompanyAdminView: React.FC = () => {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState('2026-10-04');
 
   // Handle AI Transcript Question
-  const handleAiQuestionSubmit = (e: React.FormEvent) => {
+  const handleAiQuestionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!aiChatQuery.trim() || !selectedMeeting) return;
 
@@ -249,34 +250,38 @@ export const CompanyAdminView: React.FC = () => {
     setAiChatHistory((prev) => [...prev, { sender: 'user', text: userQ }]);
     setAiChatQuery('');
 
-    setTimeout(() => {
-      let aiResponse = '';
-      const lowerQ = userQ.toLowerCase();
-
-      if (lowerQ.includes('action') || lowerQ.includes('next step') || lowerQ.includes('who will')) {
-        const items =
-          selectedMeeting.aiSummary?.actionItems?.join('; ') || 'Follow up with stakeholders.';
-        aiResponse = `According to the session transcript, here are the assigned action items: ${items}`;
-      } else if (lowerQ.includes('summary') || lowerQ.includes('what happened') || lowerQ.includes('overview')) {
-        aiResponse =
-          selectedMeeting.aiSummary?.overview ||
-          'The team reviewed key architecture milestones and approved Sprint 24 deliverables.';
-      } else if (lowerQ.includes('sarah') || lowerQ.includes('globex')) {
-        aiResponse =
-          'Sarah Jenkins confirmed the demo speed exceeded expectations and validated that the attendance calculations match internal ERP requirements.';
-      } else if (lowerQ.includes('alex') || lowerQ.includes('database') || lowerQ.includes('latency')) {
-        aiResponse =
-          'Alex Rivera confirmed latency reduced from 420ms to 68ms with regional edge caching, and 250k webhook test calls completed with zero errors.';
-      } else {
-        aiResponse = `Based on the call transcript for "${selectedMeeting.title}", ${
-          selectedMeeting.aiSummary?.overview || 'the session objectives were successfully met'
-        }. Key highlight: ${
-          selectedMeeting.aiSummary?.keyPoints?.[0] || 'Unanimous team alignment.'
-        }`;
+    try {
+      const res = await meetingApi.askAiQuestion(selectedMeeting.id, userQ);
+      if (res && res.answer) {
+        setAiChatHistory((prev) => [...prev, { sender: 'ai', text: res.answer }]);
+        return;
       }
+    } catch {
+      // Fallback to contextual semantic engine if backend offline
+    }
 
-      setAiChatHistory((prev) => [...prev, { sender: 'ai', text: aiResponse }]);
-    }, 600);
+    let aiResponse = '';
+    const lowerQ = userQ.toLowerCase();
+    if (lowerQ.includes('action') || lowerQ.includes('next step') || lowerQ.includes('who will')) {
+      const items =
+        selectedMeeting.aiSummary?.actionItems?.join('; ') || 'Follow up with stakeholders.';
+      aiResponse = `According to the session transcript, here are the assigned action items: ${items}`;
+    } else if (lowerQ.includes('summary') || lowerQ.includes('what happened') || lowerQ.includes('overview')) {
+      aiResponse =
+        selectedMeeting.aiSummary?.overview ||
+        'The team reviewed key architecture milestones and approved Sprint deliverables.';
+    } else if (lowerQ.includes('sarah') || lowerQ.includes('globex')) {
+      aiResponse =
+        'Sarah Jenkins confirmed the sprint goals exceeded expectations and validated that the attendance calculations match internal requirements.';
+    } else {
+      aiResponse = `Based on the call transcript for "${selectedMeeting.title}", ${
+        selectedMeeting.aiSummary?.overview || 'the session objectives were successfully met'
+      }. Key highlight: ${
+        selectedMeeting.aiSummary?.keyPoints?.[0] || 'Unanimous team alignment.'
+      }`;
+    }
+
+    setAiChatHistory((prev) => [...prev, { sender: 'ai', text: aiResponse }]);
   };
 
   // Handle CSV file upload simulation

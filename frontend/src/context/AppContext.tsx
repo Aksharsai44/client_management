@@ -34,6 +34,7 @@ import { chatApi } from '../services/chatApi';
 import { resourceApi } from '../services/resourceApi';
 import { settingsApi } from '../services/settingsApi';
 import { batchApi } from '../services/batchApi';
+import { meetingApi } from '../services/meetingApi';
 import {
   INITIAL_USERS,
   INITIAL_BATCHES,
@@ -114,7 +115,18 @@ interface AppContextType {
   addBatch: (batch: Omit<Batch, 'id'>) => Promise<Batch>;
   deleteBatch?: (batchId: string) => Promise<void> | void;
   refreshBatches: () => Promise<void>;
-  addMeeting: (meeting: Omit<Meeting, 'id' | 'status'>) => void;
+  refreshMeetings: () => Promise<void>;
+  refreshAttendanceRecords: () => Promise<void>;
+  addMeeting: (meeting: Omit<Meeting, 'id' | 'status'>) => Promise<Meeting>;
+  updateMeeting: (meetingId: string, partial: Partial<Meeting>) => Promise<Meeting>;
+  deleteMeeting: (meetingId: string) => Promise<void>;
+  startCall: (meetingId: string) => Promise<Meeting>;
+  endCall: (meetingId: string, details?: { durationMinutes?: number; transcript?: any[]; aiSummary?: any; participants?: any[] }) => Promise<Meeting>;
+  startInstantCall: (payload: { title?: string; batchId?: string; companyId?: string; hostName?: string; hostId?: string; meetingUrl?: string; durationMinutes?: number; description?: string }) => Promise<Meeting>;
+  logAttendance: (record: Partial<AttendanceRecord>) => Promise<AttendanceRecord>;
+  bulkMarkAttendance: (records: Partial<AttendanceRecord>[]) => Promise<void>;
+  activeLiveCall: Meeting | null;
+  setActiveLiveCall: (meeting: Meeting | null) => void;
   addCommunityPost: (
     title: string,
     content: string,
@@ -286,6 +298,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>(() => getInitialState('pricing_plans', INITIAL_PRICING_PLANS));
   const [demoRequests, setDemoRequests] = useState<DemoRequest[]>(() => getInitialState('demo_requests', INITIAL_DEMO_REQUESTS));
   const [meetings, setMeetings] = useState<Meeting[]>(() => getInitialState('meetings', INITIAL_MEETINGS));
+  const [activeLiveCall, setActiveLiveCall] = useState<Meeting | null>(null);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() => getInitialState('attendance', INITIAL_ATTENDANCE));
   const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>(() => getInitialState('community_posts', INITIAL_COMMUNITY_POSTS));
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => getInitialState('chat_messages', INITIAL_CHAT_MESSAGES));
@@ -532,6 +545,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Real-time synchronization for Meetings & Call Scheduling from PostgreSQL database
+  const refreshMeetings = async () => {
+    try {
+      const data = await meetingApi.getAllMeetings();
+      if (Array.isArray(data) && data.length > 0) {
+        setMeetings(data);
+      } else {
+        const seeded = await meetingApi.seedMeetings();
+        if (seeded && Array.isArray((seeded as any).meetings) && (seeded as any).meetings.length > 0) {
+          setMeetings((seeded as any).meetings);
+        }
+      }
+    } catch {
+      // Backend offline or booting - keep current state
+    }
+  };
+
+  // Real-time synchronization for Attendance Records from PostgreSQL database
+  const refreshAttendanceRecords = async () => {
+    try {
+      const data = await meetingApi.getAllAttendance();
+      if (Array.isArray(data) && data.length > 0) {
+        setAttendanceRecords(data);
+      }
+    } catch {
+      // Backend offline or booting
+    }
+  };
+
   // Real-time synchronization for Project MOUs from database
   const refreshProjectMOUs = async () => {
     try {
@@ -663,6 +705,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshIntegrationSettings();
     refreshCompanySettings();
     refreshBatches();
+    refreshMeetings();
+    refreshAttendanceRecords();
 
     // 1. Subscribe to Server-Sent Events (SSE) stream for real-time live push
     const unsubscribeSSE = demoRequestApi.subscribeToEvents((event) => {
@@ -828,6 +872,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         );
       } else if (event.type === 'batch_deleted' && event.data) {
         setBatches((prev) => prev.filter((b) => b.id !== event.data.id));
+      } else if (event.type === 'meeting_created' && event.data) {
+        setMeetings((prev) => (prev.some((m) => m.id === event.data.id) ? prev.map((m) => m.id === event.data.id ? event.data : m) : [event.data, ...prev]));
+      } else if (event.type === 'meeting_updated' && event.data) {
+        setMeetings((prev) => prev.map((m) => (m.id === event.data.id ? event.data : m)));
+        setActiveLiveCall((prev) => (prev && prev.id === event.data.id ? event.data : prev));
+      } else if (event.type === 'meeting_deleted' && event.data) {
+        const delId = event.data.id || (event.data.meeting && event.data.meeting.id);
+        setMeetings((prev) => prev.filter((m) => m.id !== delId));
+        setActiveLiveCall((prev) => (prev && prev.id === delId ? null : prev));
+      } else if (event.type === 'call_started' && event.data) {
+        setMeetings((prev) => prev.map((m) => (m.id === event.data.id ? { ...m, status: 'in_progress' } : m)));
+        setActiveLiveCall(event.data);
+      } else if (event.type === 'call_ended' && event.data) {
+        setMeetings((prev) => prev.map((m) => (m.id === event.data.id ? event.data : m)));
+        setActiveLiveCall((prev) => (prev && prev.id === event.data.id ? null : prev));
+        refreshAttendanceRecords();
+      } else if (event.type === 'attendance_created' && event.data) {
+        setAttendanceRecords((prev) => (prev.some((a) => a.id === event.data.id) ? prev : [event.data, ...prev]));
+      } else if (event.type === 'attendance_updated' && event.data) {
+        setAttendanceRecords((prev) => prev.map((a) => (a.id === event.data.id ? event.data : a)));
+      } else if (event.type === 'attendance_deleted' && event.data) {
+        setAttendanceRecords((prev) => prev.filter((a) => a.id !== event.data.id));
+      } else if (event.type === 'attendance_bulk_updated' && event.data?.records) {
+        setAttendanceRecords((prev) => {
+          const updatedMap = new Map(event.data.records.map((r: any) => [r.id, r]));
+          const remaining = prev.filter((r) => !updatedMap.has(r.id));
+          return [...event.data.records, ...remaining];
+        });
       }
     });
 
@@ -1925,29 +1997,159 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {}
   };
 
-  // Meetings
-  const addMeeting = (meeting: Omit<Meeting, 'id' | 'status'>) => {
+  // Meetings & Call Scheduling connected to PostgreSQL Database & Real-Time SSE
+  const addMeeting = async (meeting: Omit<Meeting, 'id' | 'status'>): Promise<Meeting> => {
     const userCompanyId = currentUser?.companyId || (currentUser?.role === 'company_admin' ? currentUser.id : undefined);
-    const newMeeting: Meeting = {
+    const meetingPayload: Partial<Meeting> = {
       ...meeting,
-      id: `meet_${Date.now()}`,
       batchId: meeting.batchId || activeBatchId,
       companyId: meeting.companyId || userCompanyId,
+      hostName: meeting.hostName || currentUser.name,
+      hostId: currentUser.id,
       status: 'upcoming',
       aiSummary: {
-        overview: 'Automated meeting sync scheduled for batch review.',
-        keyPoints: ['Initial agenda established by host', 'Session ready for live audio logging'],
-        actionItems: ['Prepare presentation slides', 'Invite designated client stakeholders'],
+        overview: `Scheduled checkpoint for batch '${meeting.batchId || activeBatchId}'.`,
+        keyPoints: ['Initial agenda established by host', 'Live audio & video bridge configured'],
+        actionItems: ['Prepare discussion points', 'Invite designated client stakeholders'],
       },
       transcript: [
         {
-          speaker: meeting.hostName,
+          speaker: meeting.hostName || currentUser.name,
           timestamp: '00:00',
-          text: `Welcome everyone to ${meeting.title}. Let's begin the review session.`,
+          text: `Scheduled session '${meeting.title}' by ${meeting.hostName || currentUser.name}.`,
         },
       ],
     };
-    setMeetings((prev) => [newMeeting, ...prev]);
+
+    try {
+      const created = await meetingApi.createMeeting(meetingPayload);
+      setMeetings((prev) => [created, ...prev.filter((m) => m.id !== created.id)]);
+      return created;
+    } catch (err) {
+      console.error('Failed to create meeting on backend, using local fallback:', err);
+      const fallbackMeeting: Meeting = {
+        ...meetingPayload,
+        id: `meet_${Date.now()}`,
+      } as Meeting;
+      setMeetings((prev) => [fallbackMeeting, ...prev]);
+      return fallbackMeeting;
+    }
+  };
+
+  const updateMeeting = async (meetingId: string, partial: Partial<Meeting>): Promise<Meeting> => {
+    try {
+      const updated = await meetingApi.updateMeeting(meetingId, partial);
+      setMeetings((prev) => prev.map((m) => (m.id === meetingId ? updated : m)));
+      return updated;
+    } catch (err) {
+      setMeetings((prev) => prev.map((m) => (m.id === meetingId ? { ...m, ...partial } : m)));
+      return { id: meetingId, ...partial } as Meeting;
+    }
+  };
+
+  const deleteMeeting = async (meetingId: string): Promise<void> => {
+    try {
+      await meetingApi.deleteMeeting(meetingId);
+    } catch (err) {
+      console.error('Failed to delete meeting on backend:', err);
+    }
+    setMeetings((prev) => prev.filter((m) => m.id !== meetingId));
+    if (activeLiveCall?.id === meetingId) {
+      setActiveLiveCall(null);
+    }
+  };
+
+  const startCall = async (meetingId: string): Promise<Meeting> => {
+    try {
+      const liveMeeting = await meetingApi.startCall(meetingId);
+      setMeetings((prev) => prev.map((m) => (m.id === meetingId ? liveMeeting : m)));
+      setActiveLiveCall(liveMeeting);
+      return liveMeeting;
+    } catch (err) {
+      setMeetings((prev) => prev.map((m) => (m.id === meetingId ? { ...m, status: 'in_progress' } : m)));
+      const fallback = meetings.find((m) => m.id === meetingId) || ({ id: meetingId, status: 'in_progress' } as Meeting);
+      setActiveLiveCall(fallback);
+      return fallback;
+    }
+  };
+
+  const endCall = async (
+    meetingId: string,
+    details?: { durationMinutes?: number; transcript?: any[]; aiSummary?: any; participants?: any[] }
+  ): Promise<Meeting> => {
+    try {
+      const completedMeeting = await meetingApi.endCall(meetingId, details);
+      setMeetings((prev) => prev.map((m) => (m.id === meetingId ? completedMeeting : m)));
+      setActiveLiveCall(null);
+      refreshAttendanceRecords();
+      return completedMeeting;
+    } catch (err) {
+      setMeetings((prev) => prev.map((m) => (m.id === meetingId ? { ...m, status: 'completed', durationMinutes: details?.durationMinutes || m.durationMinutes } : m)));
+      setActiveLiveCall(null);
+      return { id: meetingId, status: 'completed' } as Meeting;
+    }
+  };
+
+  const startInstantCall = async (payload: {
+    title?: string;
+    batchId?: string;
+    companyId?: string;
+    hostName?: string;
+    hostId?: string;
+    meetingUrl?: string;
+    durationMinutes?: number;
+    description?: string;
+  }): Promise<Meeting> => {
+    const userCompanyId = currentUser?.companyId || (currentUser?.role === 'company_admin' ? currentUser.id : undefined);
+    const liveMeeting = await meetingApi.startInstantCall({
+      ...payload,
+      batchId: payload.batchId || activeBatchId,
+      companyId: payload.companyId || userCompanyId,
+      hostName: payload.hostName || currentUser.name,
+      hostId: currentUser.id,
+    });
+    setMeetings((prev) => [liveMeeting, ...prev.filter((m) => m.id !== liveMeeting.id)]);
+    setActiveLiveCall(liveMeeting);
+    return liveMeeting;
+  };
+
+  const logAttendance = async (record: Partial<AttendanceRecord>): Promise<AttendanceRecord> => {
+    try {
+      const created = await meetingApi.createAttendance(record);
+      setAttendanceRecords((prev) => [created, ...prev.filter((a) => a.id !== created.id)]);
+      return created;
+    } catch {
+      const fallback: AttendanceRecord = {
+        id: `att_${Date.now()}`,
+        meetingId: record.meetingId || '',
+        batchId: record.batchId || activeBatchId,
+        date: record.date || new Date().toISOString().slice(0, 10),
+        userId: record.userId || currentUser.id,
+        userName: record.userName || currentUser.name,
+        userRole: record.userRole || (currentUser.role as any) || 'client',
+        status: record.status || 'present',
+        minutesPresent: record.minutesPresent || 45,
+        totalMeetingMinutes: record.totalMeetingMinutes || 45,
+        notes: record.notes || '',
+      };
+      setAttendanceRecords((prev) => [fallback, ...prev]);
+      return fallback;
+    }
+  };
+
+  const bulkMarkAttendance = async (records: Partial<AttendanceRecord>[]): Promise<void> => {
+    try {
+      const res = await meetingApi.bulkMarkAttendance(records);
+      if (res && res.records) {
+        setAttendanceRecords((prev) => {
+          const map = new Map(res.records.map((r) => [r.id, r]));
+          const rest = prev.filter((a) => !map.has(a.id));
+          return [...res.records, ...rest];
+        });
+      }
+    } catch {
+      // fallback
+    }
   };
 
   // Community
@@ -3080,8 +3282,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteUser,
         addBatch,
         deleteBatch,
-        refreshBatches,
         addMeeting,
+        updateMeeting,
+        deleteMeeting,
+        startCall,
+        endCall,
+        startInstantCall,
+        logAttendance,
+        bulkMarkAttendance,
+        refreshMeetings,
+        refreshAttendanceRecords,
+        activeLiveCall,
+        setActiveLiveCall,
         addCommunityPost,
         editCommunityPost,
         deleteCommunityPost,

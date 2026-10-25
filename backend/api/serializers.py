@@ -14,6 +14,8 @@ from .models import (
     SystemIntegrationSettings,
     CompanySettingsConfig,
     WorkspaceBatch,
+    Meeting,
+    AttendanceRecord,
 )
 
 class DemoRequestSerializer(serializers.ModelSerializer):
@@ -921,6 +923,158 @@ class WorkspaceBatchSerializer(serializers.ModelSerializer):
         if self.instance and self.instance.id:
             mutable_data['id'] = self.instance.id
         return super().to_internal_value(mutable_data)
+
+
+class MeetingSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(required=False)
+    batchId = serializers.CharField(source='batch_id', required=False)
+    companyId = serializers.CharField(source='company_id', required=False, allow_blank=True)
+    scheduleType = serializers.CharField(source='schedule_type', required=False, default='weekly')
+    dateTime = serializers.CharField(source='date_time', required=False)
+    durationMinutes = serializers.IntegerField(source='duration_minutes', required=False, default=45)
+    meetingUrl = serializers.CharField(source='meeting_url', required=False, allow_blank=True)
+    status = serializers.CharField(required=False, default='upcoming')
+    hostName = serializers.CharField(source='host_name', required=False, default='Admin')
+    hostId = serializers.CharField(source='host_id', required=False, allow_blank=True)
+    platform = serializers.CharField(required=False, default='in_app')
+    startDate = serializers.CharField(source='start_date', required=False, allow_blank=True)
+    endDate = serializers.CharField(source='end_date', required=False, allow_blank=True)
+    startTime = serializers.CharField(source='start_time', required=False, allow_blank=True)
+    recurringPattern = serializers.CharField(source='recurring_pattern', required=False, allow_blank=True)
+    recurringDays = serializers.JSONField(source='recurring_days', required=False)
+    repeatMonths = serializers.IntegerField(source='repeat_months', required=False, default=1)
+    seriesId = serializers.CharField(source='series_id', required=False, allow_blank=True)
+    aiSummary = serializers.JSONField(source='ai_summary', required=False)
+    transcript = serializers.JSONField(required=False)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    class Meta:
+        model = Meeting
+        fields = [
+            'id',
+            'batchId',
+            'companyId',
+            'title',
+            'description',
+            'scheduleType',
+            'dateTime',
+            'durationMinutes',
+            'meetingUrl',
+            'status',
+            'hostName',
+            'hostId',
+            'platform',
+            'startDate',
+            'endDate',
+            'startTime',
+            'recurringPattern',
+            'recurringDays',
+            'repeatMonths',
+            'seriesId',
+            'aiSummary',
+            'transcript',
+            'createdAt',
+            'updatedAt',
+        ]
+
+    def to_internal_value(self, data):
+        mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
+        if 'batchId' in mutable_data and 'batch_id' not in mutable_data:
+            mutable_data['batch_id'] = mutable_data['batchId']
+        if 'companyId' in mutable_data and 'company_id' not in mutable_data:
+            mutable_data['company_id'] = mutable_data['companyId']
+        if 'scheduleType' in mutable_data and 'schedule_type' not in mutable_data:
+            mutable_data['schedule_type'] = mutable_data['scheduleType']
+        if 'dateTime' in mutable_data and 'date_time' not in mutable_data:
+            mutable_data['date_time'] = mutable_data['dateTime']
+        if 'durationMinutes' in mutable_data and 'duration_minutes' not in mutable_data:
+            mutable_data['duration_minutes'] = mutable_data['durationMinutes']
+        if 'meetingUrl' in mutable_data and 'meeting_url' not in mutable_data:
+            mutable_data['meeting_url'] = mutable_data['meetingUrl']
+        if 'hostName' in mutable_data and 'host_name' not in mutable_data:
+            mutable_data['host_name'] = mutable_data['hostName']
+        if 'hostId' in mutable_data and 'host_id' not in mutable_data:
+            mutable_data['host_id'] = mutable_data['hostId']
+        if 'startDate' in mutable_data and 'start_date' not in mutable_data:
+            mutable_data['start_date'] = mutable_data['startDate']
+        if 'endDate' in mutable_data and 'end_date' not in mutable_data:
+            mutable_data['end_date'] = mutable_data['endDate']
+        if 'startTime' in mutable_data and 'start_time' not in mutable_data:
+            mutable_data['start_time'] = mutable_data['startTime']
+        if 'recurringPattern' in mutable_data and 'recurring_pattern' not in mutable_data:
+            mutable_data['recurring_pattern'] = mutable_data['recurringPattern']
+        if 'recurringDays' in mutable_data and 'recurring_days' not in mutable_data:
+            mutable_data['recurring_days'] = mutable_data['recurringDays']
+        if 'repeatMonths' in mutable_data and 'repeat_months' not in mutable_data:
+            mutable_data['repeat_months'] = mutable_data['repeatMonths']
+        if 'seriesId' in mutable_data and 'series_id' not in mutable_data:
+            mutable_data['series_id'] = mutable_data['seriesId']
+        if 'aiSummary' in mutable_data and 'ai_summary' not in mutable_data:
+            mutable_data['ai_summary'] = mutable_data['aiSummary']
+        if 'transcript' in mutable_data and 'transcript' not in mutable_data:
+            mutable_data['transcript'] = mutable_data['transcript']
+        if self.instance and self.instance.id:
+            mutable_data['id'] = self.instance.id
+        return super().to_internal_value(mutable_data)
+
+
+class AttendanceRecordSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(required=False)
+    meetingId = serializers.CharField(source='meeting_id', required=False)
+    batchId = serializers.CharField(source='batch_id', required=False)
+    companyId = serializers.CharField(source='company_id', required=False, allow_blank=True)
+    date = serializers.CharField(required=False, allow_blank=True)
+    userId = serializers.CharField(source='user_id', required=False)
+    userName = serializers.CharField(source='user_name', required=False)
+    userRole = serializers.CharField(source='user_role', required=False, default='client')
+    minutesPresent = serializers.IntegerField(source='minutes_present', required=False, default=0)
+    totalMeetingMinutes = serializers.IntegerField(source='total_meeting_minutes', required=False, default=45)
+    notes = serializers.CharField(required=False, allow_blank=True)
+    createdAt = serializers.DateTimeField(source='created_at', read_only=True)
+    updatedAt = serializers.DateTimeField(source='updated_at', read_only=True)
+
+    class Meta:
+        model = AttendanceRecord
+        fields = [
+            'id',
+            'meetingId',
+            'batchId',
+            'companyId',
+            'date',
+            'userId',
+            'userName',
+            'userRole',
+            'status',
+            'minutesPresent',
+            'totalMeetingMinutes',
+            'notes',
+            'createdAt',
+            'updatedAt',
+        ]
+
+    def to_internal_value(self, data):
+        mutable_data = data.copy() if hasattr(data, 'copy') else dict(data)
+        if 'meetingId' in mutable_data and 'meeting_id' not in mutable_data:
+            mutable_data['meeting_id'] = mutable_data['meetingId']
+        if 'batchId' in mutable_data and 'batch_id' not in mutable_data:
+            mutable_data['batch_id'] = mutable_data['batchId']
+        if 'companyId' in mutable_data and 'company_id' not in mutable_data:
+            mutable_data['company_id'] = mutable_data['companyId']
+        if 'userId' in mutable_data and 'user_id' not in mutable_data:
+            mutable_data['user_id'] = mutable_data['userId']
+        if 'userName' in mutable_data and 'user_name' not in mutable_data:
+            mutable_data['user_name'] = mutable_data['userName']
+        if 'userRole' in mutable_data and 'user_role' not in mutable_data:
+            mutable_data['user_role'] = mutable_data['userRole']
+        if 'minutesPresent' in mutable_data and 'minutes_present' not in mutable_data:
+            mutable_data['minutes_present'] = mutable_data['minutesPresent']
+        if 'totalMeetingMinutes' in mutable_data and 'total_meeting_minutes' not in mutable_data:
+            mutable_data['total_meeting_minutes'] = mutable_data['totalMeetingMinutes']
+        if self.instance and self.instance.id:
+            mutable_data['id'] = self.instance.id
+        return super().to_internal_value(mutable_data)
+
 
 
 
