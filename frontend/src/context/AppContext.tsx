@@ -3282,6 +3282,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteUser,
         addBatch,
         deleteBatch,
+        refreshBatches,
         addMeeting,
         updateMeeting,
         deleteMeeting,
